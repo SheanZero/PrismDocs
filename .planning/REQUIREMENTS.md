@@ -145,17 +145,89 @@ Explicitly excluded (BRD §7.3 / PRD)。Documented to prevent scope creep.
 
 ## Traceability
 
-Populated during roadmap creation (`gsd-roadmapper`). Each v1 requirement maps to exactly one phase.
+Each v1 requirement maps to exactly one roadmap phase (see ROADMAP.md). Populated by `gsd-roadmapper` on 2026-07-27.
+
+**Phases:** P1 Foundation · P2 Import (F1) · P3 Anchoring · P4 Lens‖Comments (F2‖F3) · P5 Loop (F4) · P6 Cards‖Clipper (F5‖F6) · P7 Context Pack (F7)
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| _(pending roadmap)_ | — | Pending |
+| IMPORT-01 | Phase 2 | Pending |
+| IMPORT-02 | Phase 2 | Pending |
+| IMPORT-03 | Phase 2 | Pending |
+| IMPORT-04 | Phase 2 | Pending |
+| IMPORT-05 | Phase 2 | Pending |
+| IMPORT-06 | Phase 2 | Pending |
+| IMPORT-07 | Phase 2 | Pending |
+| IMPORT-08 | Phase 2 | Pending |
+| IMPORT-09 | Phase 2 | Pending |
+| ANCHOR-01 | Phase 3 | Pending |
+| ANCHOR-02 | Phase 3 | Pending |
+| ANCHOR-03 | Phase 3 | Pending |
+| ANCHOR-04 | Phase 3 | Pending |
+| ANCHOR-05 | Phase 3 | Pending |
+| LENS-01 | Phase 4 | Pending |
+| LENS-02 | Phase 4 | Pending |
+| LENS-03 | Phase 4 | Pending |
+| LENS-04 | Phase 4 | Pending |
+| LENS-05 | Phase 4 | Pending |
+| LENS-06 | Phase 4 | Pending |
+| LENS-07 | Phase 4 | Pending |
+| LENS-08 | Phase 4 | Pending |
+| LENS-09 | Phase 4 | Pending |
+| LENS-10 | Phase 4 | Pending |
+| COMMENT-01 | Phase 4 | Pending |
+| COMMENT-02 | Phase 4 | Pending |
+| COMMENT-03 | Phase 4 | Pending |
+| COMMENT-04 | Phase 4 | Pending |
+| COMMENT-05 | Phase 4 | Pending |
+| COMMENT-06 | Phase 4 | Pending |
+| COMMENT-07 | Phase 4 | Pending |
+| LOOP-01 | Phase 5 | Pending |
+| LOOP-02 | Phase 5 | Pending |
+| LOOP-03 | Phase 5 | Pending |
+| LOOP-04 | Phase 5 | Pending |
+| LOOP-05 | Phase 5 | Pending |
+| LOOP-06 | Phase 5 | Pending |
+| LOOP-07 | Phase 5 | Pending |
+| LOOP-08 | Phase 5 | Pending |
+| CARD-01 | Phase 6 | Pending |
+| CARD-02 | Phase 6 | Pending |
+| CARD-03 | Phase 6 | Pending |
+| CARD-04 | Phase 6 | Pending |
+| CARD-05 | Phase 6 | Pending |
+| CARD-06 | Phase 6 | Pending |
+| CLIP-01 | Phase 6 | Pending |
+| CLIP-02 | Phase 6 | Pending |
+| CLIP-03 | Phase 6 | Pending |
+| CLIP-04 | Phase 6 | Pending |
+| CLIP-05 | Phase 6 | Pending |
+| CLIP-06 | Phase 6 | Pending |
+| CLIP-07 | Phase 6 | Pending |
+| PACK-01 | Phase 7 | Pending |
+| PACK-02 | Phase 7 | Pending |
+| PACK-03 | Phase 7 | Pending |
+| PACK-04 | Phase 7 | Pending |
+| PACK-05 | Phase 7 | Pending |
+| PACK-06 | Phase 7 | Pending |
+| AGENT-01 | Phase 5 | Pending |
+| AGENT-02 | Phase 5 | Pending |
+| AGENT-03 | Phase 1 | Pending |
+| AGENT-04 | Phase 5 | Pending |
+| NFR-01 | Phase 2 | Pending |
+| NFR-02 | Phase 1 | Pending |
+| NFR-03 | Phase 1 | Pending |
+| NFR-04 | Phase 1 | Pending |
+| NFR-05 | Phase 4 | Pending |
+| NFR-06 | Phase 4 | Pending |
+| NFR-07 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 69 total（IMPORT 9 · ANCHOR 5 · LENS 10 · COMMENT 7 · LOOP 8 · CARD 6 · CLIP 7 · PACK 6 · AGENT 4 · NFR 7）
-- Mapped to phases: 0（roadmapper 待填）
-- Unmapped: TBD ⚠️
+- Mapped to phases: 69 / 69 ✓
+- Unmapped: 0 ✓
+
+**Per-phase counts:** P1 = 4 (AGENT-03, NFR-02/03/04) · P2 = 10 (IMPORT-01..09, NFR-01) · P3 = 5 (ANCHOR-01..05) · P4 = 19 (LENS-01..10, COMMENT-01..07, NFR-05/06) · P5 = 12 (LOOP-01..08, AGENT-01/02/04, NFR-07) · P6 = 13 (CARD-01..06, CLIP-01..07) · P7 = 6 (PACK-01..06)
 
 ---
 *Requirements defined: 2026-07-27*
-*Last updated: 2026-07-27 after initialization*
+*Last updated: 2026-07-27 after roadmap creation (traceability populated)*
