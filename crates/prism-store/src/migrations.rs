@@ -99,6 +99,70 @@ mod tests {
         );
     }
 
+    /// 在 external-content FTS 索引里数命中行数。查询串统一包成双引号短语，
+    /// 避免用户输入被当作 FTS5 查询语法解析。
+    fn fts_hits(conn: &Connection, needle: &str) -> i64 {
+        let phrase = format!("\"{}\"", needle.replace('"', "\"\""));
+        conn.query_row(
+            "SELECT count(*) FROM documents_fts WHERE documents_fts MATCH ?1",
+            [&phrase],
+            |r| r.get(0),
+        )
+        .unwrap_or_else(|e| panic!("fts match on {needle:?} failed: {e}"))
+    }
+
+    /// 方案 A 的已知弱点是「触发器出错时表现为搜不到而非报错」。这个测试是它的兜底：
+    /// INSERT / UPDATE / DELETE 三条同步路径逐条走一遍，任何一个触发器缺失或写错都会变红。
+    /// 顺带证明索引粒度保持全粒度——「锚定引擎」是 4 个 unicode 字符，
+    /// 若 detail 被降级，这一句 MATCH 会直接失效。
+    #[test]
+    fn fts_index_stays_in_sync_across_insert_update_and_delete() {
+        let conn = migrated();
+        conn.execute(
+            "INSERT INTO projects(id,name,root_path,created_at) VALUES('p1','P','/tmp',0)",
+            [],
+        )
+        .expect("seed project");
+        conn.execute(
+            "INSERT INTO documents(id,project_id,rel_path,title,content,content_hash,updated_at) \
+             VALUES('d1','p1','a.md','设计说明','锚定引擎的实现细节','h1',0)",
+            [],
+        )
+        .expect("seed document");
+
+        assert_eq!(
+            fts_hits(&conn, "锚定引擎"),
+            1,
+            "documents_ai 未把新行同步进 FTS 索引"
+        );
+
+        conn.execute(
+            "UPDATE documents SET content='评论回流的闭环说明' WHERE id='d1'",
+            [],
+        )
+        .expect("update document");
+
+        assert_eq!(
+            fts_hits(&conn, "锚定引擎"),
+            0,
+            "documents_au 的 delete 半边未撤下旧内容——索引会留下搜得到的幽灵行"
+        );
+        assert_eq!(
+            fts_hits(&conn, "评论回流"),
+            1,
+            "documents_au 的 insert 半边未写入新内容"
+        );
+
+        conn.execute("DELETE FROM documents WHERE id='d1'", [])
+            .expect("delete document");
+
+        assert_eq!(
+            fts_hits(&conn, "评论回流"),
+            0,
+            "documents_ad 未从 FTS 索引撤下已删除的行"
+        );
+    }
+
     #[test]
     fn to_latest_is_idempotent() {
         let mut conn = Connection::open_in_memory().expect("in-memory db");
