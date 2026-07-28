@@ -33,7 +33,16 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Document content is only ever sent to the user-configured LLM endpoint, and no telemetry is enabled by default. [NFR-03]
   4. The loopback MCP endpoint binds 127.0.0.1 only, rejects any request lacking the per-install token or bearing a foreign `Origin`, scopes to the current Workspace, and exposes no write surface beyond comment回执. [AGENT-03]
   5. The Tauri-vs-Node-sidecar ADR is resolved and recorded, and the shell-agnostic `core` skeleton, SQLite schema + migrations, and typed IPC contract are in place.
-**Plans**: TBD
+**Plans:** 7 plans in 5 waves
+
+Plans:
+- [ ] 01-01-PLAN.md — Preflight: toolchain gate, Cargo workspace + Tauri/React scaffold, stack-doc version corrections
+- [ ] 01-02-PLAN.md — TRACER: end-to-end "configure my LLM endpoint and see it connect" walking skeleton
+- [ ] 01-03-PLAN.md — Local-first store: project identity that survives a move, WAL durability, backup/export
+- [ ] 01-04-PLAN.md — Loopback MCP engine: transport + the full AGENT-03 security boundary, headless
+- [ ] 01-05-PLAN.md — Shell integration: MCP host resident with the app on a scanned port, project home
+- [ ] 01-06-PLAN.md — Onboarding steps 2–4: workspace registration, `.prismdocs/` init, `.mcp.json` + protocol snippet
+- [ ] 01-07-PLAN.md — ADR 0001 (Tauri vs Node sidecar) and macOS CI with a core/shell split
 
 ### Phase 2: Project Import & FS Watcher (F1)
 **Goal**: Turn a local folder or Git repo into a live, disk-authoritative Base layer — imported, watched, frontmatter-parsed — with a change-event contract robust enough for everything downstream to trust.
@@ -123,7 +132,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Core Engine Skeleton | 0/TBD | Not started | - |
+| 1. Foundation & Core Engine Skeleton | 0/7 | Planned | - |
 | 2. Project Import & FS Watcher (F1) | 0/TBD | Not started | - |
 | 3. Block Anchoring Engine | 0/TBD | Not started | - |
 | 4. Lens Projection ‖ Block Comments (F2 ‖ F3) | 0/TBD | Not started | - |
