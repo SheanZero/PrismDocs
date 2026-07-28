@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-07-28T14:23:56.609Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-07-28T14:35:13.420Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 9
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Status: Ready to execute
 Last activity: 2026-07-28 — Phase 01 execution started
 
-Progress: [█░░░░░░░░░] 11%
+Progress: [██░░░░░░░░] 22%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [█░░░░░░░░░] 11%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 39min | 3 tasks | 53 files |
+| Phase 01 P02 | 8min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 1]: prism-mcp 的 protocol_version() 用 static 承载 rmcp ProtocolVersion::LATEST（内含 Cow，const 提升不适用）
 - [Phase 1]: 暂无自然用途的依赖（prism-llm serde、prism-anchor similar/ulid、prism-mcp axum/tokio）以依赖可用性单测引用，不提前发明后续 phase 的公开 API
 - [Phase 1]: INFRA-01 不在 plan 01-01 勾选：该需求横跨本 phase 的 7 个 plan，事件总线与 Channel 有序流在 01-04/01-08/01-09
+- [Phase ?]: 依赖方向断言用 herestring 而非管道喂 grep：pipefail + grep -q 早退会因 SIGPIPE 让四条断言全部静默恒绿
+- [Phase ?]: 覆盖率 Phase 1 只测量不设阈值（engine 85.48% / 前端 10%），Phase 2 按排除已登记人工与 ignored 路径后 >=80% 开硬闸门
 
 ### Pending Todos
 
@@ -99,6 +102,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T14:23:56.603Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-07-28T14:35:13.415Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
