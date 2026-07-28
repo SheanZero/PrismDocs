@@ -35,31 +35,37 @@ PrismDocs 是面向 vibe coder 的工程文档工作台：AI 用英文维护紧�
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| **Tauri** | 2.10.1 | Desktop app shell (macOS-first, Windows P1) | ~8-12 MB bundles vs Electron's 150 MB+; a local-first app that stays resident must be light. Rust backend is the natural home for the CPU-bound engine (FS watch, markdown parse, diff-based anchor migration, SQLite). Cross-platform: same codebase reaches Windows for P1 at near-zero incremental cost — a SwiftUI app could not. System WebView means the rich editor UI is still web tech. |
-| **Rust** | 1.85+ | Engine language (Tauri core) | Required by comrak 0.54; owns FS/DB/parse/anchoring/keychain/LLM/MCP. Deterministic, fast, single source of truth for anchoring logic. |
+| **Tauri** | 2.11.5 | Desktop app shell (macOS-first, Windows P1) | ~8-12 MB bundles vs Electron's 150 MB+; a local-first app that stays resident must be light. Rust backend is the natural home for the CPU-bound engine (FS watch, markdown parse, diff-based anchor migration, SQLite). Cross-platform: same codebase reaches Windows for P1 at near-zero incremental cost — a SwiftUI app could not. System WebView means the rich editor UI is still web tech. |
+| **Rust** | 1.95+ | Engine language (Tauri core) | Workspace MSRV, pinned in `rust-toolchain.toml`. Driven by **rusqlite_migration 2.6**, not by comrak — comrak's 1.85 and keyring's 1.88 are both below it. Owns FS/DB/parse/anchoring/keychain/LLM/MCP. Deterministic, fast, single source of truth for anchoring logic. |
 | **React** | 19.x | Webview UI framework | Largest editor/annotation component ecosystem; Tauri's official templates support it. (Svelte 5 or SolidJS are fine substitutes if the team prefers — not load-bearing.) |
-| **Vite** | 6.x | Webview build tool | Tauri default; fast HMR against the Rust dev server. |
-| **rusqlite** | 0.32.x (bundled feature) | Sidecar metadata store (Block IDs, comments, cards, Lens cache, anchors, provenance, clips) | For a pure-SQLite embedded desktop app, rusqlite is the no-debate choice: direct, zero ORM overhead, statically links SQLite via the `bundled` feature (no system libsqlite dependency). Use **WAL mode** so the MCP reader and the app writer don't block each other. |
+| **Vite** | 7.x | Webview build tool | Tauri default; fast HMR against the Rust dev server. |
+| **rusqlite** | 0.40.x (bundled feature) | Sidecar metadata store (Block IDs, comments, cards, Lens cache, anchors, provenance, clips) | For a pure-SQLite embedded desktop app, rusqlite is the no-debate choice: direct, zero ORM overhead, statically links SQLite via the `bundled` feature (no system libsqlite dependency). Use **WAL mode** so the MCP reader and the app writer don't block each other. **0.40 is not optional:** rusqlite_migration 2.6 requires `rusqlite ^0.40`, and `libsqlite3-sys` declares `links = "sqlite3"`, so a version split is a hard Cargo error rather than a silent duplicate. |
+| **r2d2** + **r2d2_sqlite** | 0.8.x / 0.35.x | Connection pool in front of the sidecar store | **Required, not optional.** `rusqlite::Connection` is `Send` but **not `Sync`**, so the obvious "shared DB handle" spelling is `Arc<Mutex<Connection>>` — which serializes every read behind every write and cancels the entire benefit of WAL. The facade holds a pool. 0.35 is currently the only pool crate on `rusqlite ^0.40` (deadpool-sqlite and tokio-rusqlite are both still on older majors). |
+| **axum** | 0.8.x | Loopback HTTP host for the MCP endpoint | rmcp ships a `tower_service::Service`, **not a server** — something has to mount it. axum 0.8 is what the official rmcp example uses, and it also supplies `middleware::from_fn_with_state` for the bearer-token layer and the route slot for the Phase-6 clip WebSocket. |
 | **SQLite FTS5** | (bundled in rusqlite) | Full-text search (<300ms over 500 docs / 2000 cards, per PRD §5) | Built into SQLite, no extra service, trivially hits the perf target. Index doc/card/clip text into an FTS5 virtual table. |
+
+> **Version source:** every pin in this table was verified against crates.io on **2026-07-28** and is recorded in `.planning/phases/01-foundation-core-engine-skeleton/01-RESEARCH.md` § Standard Stack. The authoritative pins live in the root `Cargo.toml` `[workspace.dependencies]` block; this table mirrors it. The `rmcp` transport row reflects decision **D-07**, which overrides the earlier stdio description.
 | **comrak** | 0.54.0 | Markdown → Block AST (source of truth for anchoring) | CommonMark 0.31.2 + GFM compatible; **exposes `sourcepos`** (line/col span per node) — essential for mapping Blocks to file offsets, extracting comment quotes, and re-rendering. It produces a real arena AST tree (not just an event stream), which is what block-level anchoring needs. Used by crates.io, docs.rs, GitLab, Deno. |
-| **rmcp** | 2.2.0 | Local MCP server (Rust official SDK) | Official `modelcontextprotocol/rust-sdk`. Tracks the 2026-07-28 draft while staying compatible with the 2025-11-25 stable protocol. Keeps MCP in Rust → no Node runtime to bundle, one process, one DB handle. Exposes `list_feedback` / `get_feedback` / `respond_to_comment` / `get_document_comments` / `get_context_pack` (PRD §4.2) over **stdio** to the agent, with loopback IPC back to the running app. |
+| **rmcp** | 2.2.0 | Local MCP server (Rust official SDK) | Official `modelcontextprotocol/rust-sdk`. Tracks the 2026-07-28 draft while staying compatible with the 2025-11-25 stable protocol. Keeps MCP in Rust → no Node runtime to bundle, one process, one DB handle. Exposes `list_feedback` / `get_feedback` / `respond_to_comment` / `get_document_comments` / `get_context_pack` (PRD §4.2) over **app-hosted loopback streamable HTTP** — the resident app itself serves `rmcp`'s `StreamableHttpService` on `127.0.0.1:<port>`, guarded by a per-install bearer token and a non-empty `Origin` allowlist. **No subprocess and no second IPC hop:** the app *is* the MCP server and wraps the Engine facade directly. Requires features `server` + `macros` + `transport-streamable-http-server`. |
 
 ### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| **notify** + **notify-debouncer-full** | notify 8.x | FS watcher (REQ-1.4) | Standard Rust file-watching stack. `notify-debouncer-full` gives the 2s debounce/coalescing PRD requires for agents that write in bursts, plus rename/move coalescing needed for AC-1c. |
-| **similar** | 2.x | Diff-based Block anchor migration | mitsuhiko's diffing crate (LCS / patience). This is the engine behind "match old Blocks to new Blocks by content similarity + relative position," the moat feature. Pair with a content-hash + heading-path heuristic. |
+| **notify** + **notify-debouncer-full** | notify 8.x / debouncer 0.7.x | FS watcher (REQ-1.4) | Standard Rust file-watching stack. `notify-debouncer-full` gives the 2s debounce/coalescing PRD requires for agents that write in bursts, plus rename/move coalescing needed for AC-1c. |
+| **similar** | 3.1.x | Diff-based Block anchor migration | mitsuhiko's diffing crate (LCS / patience). This is the engine behind "match old Blocks to new Blocks by content similarity + relative position," the moat feature. Pair with a content-hash + heading-path heuristic. |
 | **blake3** | 1.x | Content hashing for stable Block IDs | Fast, collision-resistant hash of normalized Block text → the content-hash half of the Block ID (positional heuristic is the other half). Also used to detect renamed/moved files (REQ-1.2 edge case) as the same document. |
-| **rusqlite_migration** | 1.x | Schema migrations for the sidecar DB | Keeps the SQLite schema versioned; ships migrations with the app. |
-| **gray_matter** (Rust crate) | 0.2.x | YAML frontmatter parse (REQ-1.8, OKF six fields) | Parses existing frontmatter into structured metadata and round-trips without corrupting user files (§2.5 "round-trip不破坏"). Materializes frontmatter only on OKF export (REQ-7.6). |
-| **htmd** | 0.1.x | HTML → Markdown on the desktop side (REQ-1.3, AI-generated .html import) | Turndown-inspired Rust converter; keeps HTML import in the Rust core. (The Chrome extension uses turndown.js separately — see below.) |
-| **keyring** crate (via **tauri-plugin-keyring**) | keyring-core based | API keys in the OS keychain (PRD §5, macOS Keychain / Windows Credential Manager) | Native secure storage directly from Rust, no master-password prompt. **Prefer this over `tauri-plugin-stronghold`** — Stronghold is officially slated for deprecation/removal in Tauri v3. |
-| **reqwest** | 0.12.x | HTTP client for LLM calls (Rust core) | Async, TLS, streaming bodies. Keys never leave the Rust process (read from keychain). Supports custom `base_url` for OpenAI-compatible / proxy / local endpoints (PRD §5). |
+| **rusqlite_migration** | 2.6.x | Schema migrations for the sidecar DB | Keeps the SQLite schema versioned; ships migrations with the app. Tracks the version in SQLite's `user_version` header field, so there is no migrations table to query. **This crate sets the workspace MSRV of 1.95 and requires `rusqlite ^0.40`.** Enable WAL and foreign keys *outside* migrations, in the pool customizer. |
+| **gray_matter** (Rust crate) | 0.3.x | YAML frontmatter parse (REQ-1.8, OKF six fields) | Parses existing frontmatter into structured metadata and round-trips without corrupting user files (§2.5 "round-trip不破坏"). Materializes frontmatter only on OKF export (REQ-7.6). |
+| **htmd** | 0.5.x | HTML → Markdown on the desktop side (REQ-1.3, AI-generated .html import) | Turndown-inspired Rust converter; keeps HTML import in the Rust core. (The Chrome extension uses turndown.js separately — see below.) |
+| **keyring** crate (used **directly**, not via a Tauri plugin) | 4.1.x | API keys in the OS keychain (PRD §5, macOS Keychain / Windows Credential Manager) | Native secure storage directly from Rust, no master-password prompt. `Entry::new(service, account)` → a macOS Keychain generic-password item; service is `PrismDocs`, with two accounts (the LLM key and the per-install MCP token). 4.x is a thin `v1` facade over `keyring-core` — same `Entry` API, different dependency graph. **Prefer this over `tauri-plugin-stronghold`** (deprecation slated for Tauri v3) **and over `tauri-plugin-keyring`** (0.1.0, last published 2024-12-23, no repository URL — and it would wrongly put secret access behind the shell). |
+| **reqwest** | 0.13.x | HTTP client for LLM calls (Rust core) | Async, TLS, streaming bodies. Keys never leave the Rust process (read from keychain). Supports custom `base_url` for OpenAI-compatible / proxy / local endpoints (PRD §5). 0.13 is where rmcp 2.2, async-openai 0.41 and tauri 2.11 all converge — pinning 0.12 forks the tree into two TLS stacks. **Feature names changed in 0.13:** 0.12's `rustls-tls` is now `rustls`, and trust anchors are a separate feature (`rustls-native-certs` to read the macOS system trust store). Declared in exactly one crate, `prism-llm`, so NFR-03's single-egress guarantee is a property of the module graph. |
 | **eventsource-stream** | 0.2.x | SSE parsing for streaming LLM responses | Parses Anthropic `content_block_delta` / OpenAI `chat.completion.chunk` SSE for per-segment streaming Lens rendering (REQ-2.8). |
-| **async-openai** | 0.27.x | OpenAI-compatible client (streaming, base_url) | Mature Rust client; `with_config` supports custom base_url → covers OpenAI + the long tail of OpenAI-compatible providers/proxies/local models in one client. |
-| **tiktoken-rs** | 0.6.x | Local token counting for OpenAI-family models (o200k_base) | In-process token estimate for cost display (REQ-2.9, F7 token totals) without a network round-trip. For Claude, call Anthropic's `messages/count_tokens` REST endpoint for exact counts. |
-| **tokio** | 1.x | Async runtime | Required by rmcp, reqwest, notify debouncer; Tauri v2 is async-native. |
+| **async-openai** | 0.41.x | OpenAI-compatible client (streaming, base_url) | Mature Rust client; `with_config` supports custom base_url → covers OpenAI + the long tail of OpenAI-compatible providers/proxies/local models in one client. |
+| **tiktoken-rs** | 0.12.x | Local token counting for OpenAI-family models (o200k_base) | In-process token estimate for cost display (REQ-2.9, F7 token totals) without a network round-trip. For Claude, call Anthropic's `messages/count_tokens` REST endpoint for exact counts. |
+| **tokio** | 1.x | Async runtime | Required by rmcp, reqwest, axum, notify debouncer; Tauri v2 is async-native. `rusqlite` is blocking, so every store call reached from async goes through `spawn_blocking`. |
+
+> **Version source:** verified against crates.io on **2026-07-28**; see `.planning/phases/01-foundation-core-engine-skeleton/01-RESEARCH.md` § Standard Stack. Crates already in the tree are pinned in the root `Cargo.toml`; the rest (comrak, similar, blake3, gray_matter, htmd, notify, tiktoken-rs) arrive in Phases 2–4 and their versions here are advisory until then.
 
 ### Chrome MV3 Extension (separate artifact)
 
@@ -88,41 +94,53 @@ PrismDocs 是面向 vibe coder 的工程文档工作台：AI 用英文维护紧�
 
 # Tauri plugins (JS side)
 
-# Rust core deps (src-tauri/Cargo.toml)
+# Rust core deps — declared once in the ROOT Cargo.toml [workspace.dependencies]
 
-#   tauri = "2.10"
+# and inherited by each crate with `.workspace = true`. Not in src-tauri/Cargo.toml:
 
-#   rusqlite = { version = "0.32", features = ["bundled"] }
+# src-tauri is a thin shell member, and the core crates must not depend on tauri (D-01).
 
-#   rusqlite_migration = "1"
+#   tauri = { version = "2.11", features = [] }
 
-#   comrak = "0.54"
+#   rusqlite = { version = "0.40", features = ["bundled"] }
 
-#   similar = "2"
+#   rusqlite_migration = "2.6"
 
-#   blake3 = "1"
+#   r2d2 = "0.8"
 
-#   gray_matter = "0.2"
+#   r2d2_sqlite = "0.35"
 
-#   htmd = "0.1"
+#   axum = "0.8"
 
-#   notify = "8"
-
-#   notify-debouncer-full = "0.4"
-
-#   reqwest = { version = "0.12", features = ["json", "stream"] }
+#   reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls", "rustls-native-certs", "http2"] }
 
 #   eventsource-stream = "0.2"
 
-#   async-openai = "0.27"
+#   async-openai = "0.41"
 
-#   tiktoken-rs = "0.6"
-
-#   rmcp = { version = "2.2", features = ["server", "transport-io"] }
+#   rmcp = { version = "2.2", features = ["server", "macros", "transport-streamable-http-server"] }
 
 #   tokio = { version = "1", features = ["full"] }
 
-#   keyring = "3"   # or tauri-plugin-keyring
+#   keyring = "4.1"   # the crate directly — NOT tauri-plugin-keyring
+
+# Arriving in later phases (Phase 2 import, Phase 3 anchoring, Phase 4 lens):
+
+#   comrak = "0.54"
+
+#   similar = "3.1"
+
+#   blake3 = "1"
+
+#   gray_matter = "0.3"
+
+#   htmd = "0.5"
+
+#   notify = "8"
+
+#   notify-debouncer-full = "0.7"
+
+#   tiktoken-rs = "0.12"
 
 # --- Chrome MV3 extension (separate package) ---
 
@@ -143,10 +161,14 @@ PrismDocs 是面向 vibe coder 的工程文档工作台：AI 用英文维护紧�
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
 | **Electron (as default)** | ~150 MB bundle + high idle RAM on an always-on local-first app; no Rust-engine benefit. | Tauri v2. |
-| **tauri-plugin-stronghold** for API keys | Officially slated for deprecation and removal in Tauri v3; you'd be building on a dead-end. | `keyring` crate / `tauri-plugin-keyring` (native OS keychain). |
+| **tauri-plugin-stronghold** for API keys | Officially slated for deprecation and removal in Tauri v3; you'd be building on a dead-end. | The `keyring` crate 4.1 used **directly from `prism-llm`** (native OS keychain). Not `tauri-plugin-keyring` either: 0.1.0, last published 2024-12-23, no repository URL, and it would put secret access behind the shell in violation of D-01. |
 | **Writing Block IDs into user `.md` files** | Violates the hard "don't pollute source" constraint (PROJECT.md, PRD §2.4); breaks git/IDE/agent workflows. | Store all Block IDs/comments/cards in the sidecar SQLite DB; materialize frontmatter only on OKF export. |
 | **Two markdown parsers for anchoring** (comrak in Rust *and* remark in JS both authoritative) | Non-deterministic Block boundaries across parsers → silent anchor drift, the #1 moat risk. | comrak (Rust) is the single source of truth for Block boundaries/IDs; remark/react-markdown is render-only. |
-| **Storing the metadata DB inside the repo's `.prismdocs/`** | Would create git noise and risk committing private comments/cards; conflicts with Q3's sidecar decision. | Keep the SQLite DB in the app data dir (`~/Library/Application Support/PrismDocs/`, keyed by project path). Reserve in-repo `.prismdocs/feedback` + `.prismdocs/context` only for agent-handoff files (gitignored by default per PRD §4.1). |
+| **Storing the metadata DB inside the repo's `.prismdocs/`** | Would create git noise and risk committing private comments/cards; conflicts with Q3's sidecar decision. | Keep the SQLite DB in the app data dir (`~/Library/Application Support/PrismDocs/`), keyed by **project-id, never by project path** (D-13) — a path key loses the data the moment the user moves or renames the folder. Note that Tauri's `PathResolver::app_data_dir()` yields `~/Library/Application Support/<bundle-identifier>`, **not** the human-readable `.../PrismDocs/`; since this is a user-visible backup location (D-12), compute it with `dirs::data_dir().join("PrismDocs")` in the shell and inject the path into the core. Reserve in-repo `.prismdocs/feedback` + `.prismdocs/context` only for agent-handoff files (gitignored by default per PRD §4.1). |
+| **Calling `app_data_dir()` (or any `AppHandle` API) from a core crate** | It would make `prism-store` untestable without a running Tauri app, defeating the entire point of the workspace split (D-01). | The shell resolves paths and passes them down; core crates take an injected `PathBuf` and tests pass a `TempDir`. |
+| **`Arc<Mutex<Connection>>` as the facade's shared DB handle** | Literally satisfies "one shared handle" and silently cancels WAL: `Connection` is `!Sync`, the mutex is forced, and every read then queues behind every write. | An `r2d2::Pool<SqliteConnectionManager>`, which is `Send + Sync`; call `pool.get()` per operation. |
+| **Leaving rmcp's `allowed_origins` at its default** | The default is an **empty vec, which disables Origin validation entirely** — the security acceptance test would pass vacuously. | Call `.with_allowed_origins([...])` explicitly. A *missing* Origin header must still pass: Claude Code is not a browser and sends none. |
+| **Writing the MCP bearer token into `.mcp.json`** | Project-scoped `.mcp.json` sits at the repo root and is designed to be committed — that leaks a live loopback credential into git. | Use Claude Code's `headersHelper` indirection (a small script that reads the token from the Keychain) or `${VAR}` env expansion. The token itself lives only in the Keychain. |
 | **Binding the MCP/bridge servers to `0.0.0.0`** | Security: PRD requires loopback-only, workspace-scoped, read-mostly. | Bind strictly to `127.0.0.1` (or a Unix domain socket in the app data dir); scope to current workspace; only `respond_to_comment` writes. |
 | **js-tiktoken in the extension** | ~200 KB, heavier than needed for a ±10% estimate in an MV3 worker. | gpt-tokenizer (o200k_base, ~50 KB). |
 | **`chrono` for time / naive FS polling** | Polling misses agent burst-writes and wastes CPU; use event-based watching. | `notify` + `notify-debouncer-full` (event-based, debounced). |
@@ -165,10 +187,12 @@ PrismDocs 是面向 vibe coder 的工程文档工作台：AI 用英文维护紧�
 
 | Package | Compatible With | Notes |
 |---------|-----------------|-------|
-| comrak 0.54 | Rust 1.85+ | Hard MSRV; set toolchain accordingly. |
-| Tauri 2.10 | `@tauri-apps/api` 2.x, `@tauri-apps/cli` 2.x | Keep JS API and Rust crate on the same major (v2). |
-| rusqlite (`bundled`) | — | `bundled` feature statically links SQLite; no system libsqlite needed → reproducible builds across macOS/Windows. |
-| rmcp 2.2 | MCP protocol 2025-11-25 (stable) + 2026-07-28 (draft) | **Pin to the 2025-11-25 stable protocol for launch;** upgrade to the new spec only after Claude Code / Cursor adopt it (new spec lands 2026-07-28, one day out). |
+| **Workspace MSRV** | **Rust 1.95** | The binding constraint, pinned in `rust-toolchain.toml`. Set by **rusqlite_migration 2.6**. comrak's 1.85 and keyring's 1.88 are both below it, so satisfying 1.95 satisfies everything. |
+| comrak 0.54 | Rust 1.85+ | Its own MSRV, but not the workspace floor — see the row above. |
+| Tauri 2.11 | `@tauri-apps/api` 2.x, `@tauri-apps/cli` 2.x | Keep JS API and Rust crate on the same major (v2). |
+| rusqlite 0.40 (`bundled`) | rusqlite_migration 2.6, r2d2_sqlite 0.35 | `bundled` statically links SQLite; no system libsqlite needed → reproducible builds across macOS/Windows. These three versions move as a set: `libsqlite3-sys` declares `links = "sqlite3"`, so two rusqlite versions in one graph is a hard Cargo error. `cargo tree -d` is the gate. |
+| reqwest 0.13 | rmcp 2.2, async-openai 0.41, tauri 2.11 | The whole HTTP ecosystem moved together. Feature rename from 0.12: `rustls-tls` → `rustls`, with trust anchors split out (`rustls-native-certs`). |
+| rmcp 2.2 | MCP protocol 2025-11-25 (stable) + 2026-07-28 (draft) | **Satisfied by construction — no action needed.** `ProtocolVersion::LATEST` in rmcp 2.2.0 already resolves to `V_2025_11_25` and is the `Default`. `KNOWN_VERSIONS` also contains the 2026-07-28 draft, but it is never selected by default. Upgrade only after Claude Code / Cursor adopt the new spec. |
 | @modelcontextprotocol/sdk (TS) | v1.29.0 = stable; v2 = beta | If you go the Node-sidecar route, ship v1.x for production; v2 API can still change until 2026-07-28. |
 | gpt-tokenizer o200k_base | GPT-4o/4.1/5, o1/o3/o4 | Correct encoding for current OpenAI models; use as the universal extension estimate. |
 
