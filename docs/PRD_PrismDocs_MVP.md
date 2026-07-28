@@ -4,9 +4,9 @@
 |---|---|
 | 产品代号 | PrismDocs（暂定） |
 | 文档类型 | 主 PRD（Master PRD）— MVP 版本 |
-| 版本 | v0.2（合并《补充调研：CoWiki 与 OKF》变更 P1–P8，变更记录见 §9；各子 PRD 的 REQ-x.NEW 回填评审留待 v0.3） |
-| 日期 | 2026-07-26 |
-| 上游文档 | 《BRD：面向 Vibe Coding 的双层文档管理应用（MVP）》v0.2 |
+| 版本 | v0.3（构想 v2 合并：速读区 MVP、新增 F8 跨项目知识层、F6 降级 P1、变更时间线，变更记录见 §9；各子 PRD 的 REQ-x.NEW 逐条 triage 仍待进行，其中 schema 级三条已实质采纳，见 §9） |
+| 日期 | 2026-07-28 |
+| 上游文档 | 《BRD：面向 Vibe Coding 的双层文档管理应用（MVP）》v0.3 |
 | 作者 | Shean（起草协作：Claude） |
 
 ---
@@ -15,16 +15,16 @@
 
 ### 1.1 产品一句话
 
-PrismDocs 是 vibe coder 的工程文档工作台：AI 维护紧凑的英文技术文档（Base 层），产品自动投影为用户母语的口语化版本（Lens 层）；用户在文档上写评论驱动 AI 迭代，用自己的语言写卡片沉淀理解，用 Chrome 插件把网页资料剪进知识库。
+PrismDocs 是 vibe coder 的多项目工程知识工作台：集中管理编码 agent 在各仓库生成的英文技术文档（Base 层），产品为每份文档生成中文速读区（讲清内容、取舍与待决策点；全文口语化投影 Lens 为 P1）；用户在文档上写评论驱动 AI 迭代，每次变更可追溯到驱动它的评论；项目间文档相互引用、契约可订阅，上游变更自动警示下游核对；用户用自己的语言写卡片沉淀理解。（Chrome 剪藏插件 v0.3 起为 P1。）
 
 ### 1.2 本 PRD 的范围
 
-覆盖 BRD 中 P0 功能 F1–F7 的完整产品需求，包括交互、状态、边界情况、验收标准，以及支撑它们的信息架构、数据模型和 agent 集成协议。P1 功能（多语言 Lens、图谱视图、多人协作等）不在本文范围，仅在架构上预留。
+覆盖 BRD 中 P0 功能 F1–F5、F7、F8 的完整产品需求，包括交互、状态、边界情况、验收标准，以及支撑它们的信息架构、数据模型和 agent 集成协议。P1 功能（全文 Lens、F6 剪藏、语义漂移检测、多语言速读区、图谱视图、多人协作与团队版因果追溯等）不在本文范围，仅在架构上预留；F2 的全文 Lens 需求与 F6 全部需求保留于对应子 PRD，标注 P1。
 
 ### 1.3 产品形态
 
 - **桌面应用**（macOS 优先，本地优先架构：文档、评论、卡片全部落在本地，不强制上云）
-- **Chrome 扩展**（剪藏器，MV3）
+- **Chrome 扩展**（剪藏器，MV3）——v0.3 起为 P1，MVP 不交付
 - **本地 MCP Server + 文件协议**（与 Claude Code / Cursor 等编码 agent 的接口）
 - LLM 能力：用户自备 API key（MVP 首发，支持 Anthropic / OpenAI 兼容端点），订阅制内置额度后置。
 
@@ -44,14 +44,16 @@ P1 独立 vibe coder（中文母语，用 Claude Code / Cursor 开发，首要�
 
 | 对象 | 说明 |
 |---|---|
-| **Workspace** | 顶层容器，对应一个用户的全部知识库。MVP 单 Workspace |
+| **Workspace** | 顶层容器，对应一个用户的全部知识库。MVP 单 Workspace。v0.3 起为实体而非壳：跨项目搜索、跨项目 Inbox 聚合、跨项目引用（Xref）的作用域 |
 | **Project** | 对应一个代码仓库/工作目录。含文档、卡片、剪藏的关联 |
 | **Document（Base 层）** | 唯一真相源。英文 Markdown 文件，与磁盘上的真实文件双向同步（`docs/**/*.md`、`CLAUDE.md`、`AGENTS.md` 等） |
-| **Lens** | Base 文档的口语化投影（MVP：简体中文）。派生数据，不可编辑，随 Base 增量重建 |
+| **Digest（速读区，v0.3 修订）** | Base 文档的中文头部摘要（3–5 句摘要 + ❓ 决策清单 + 变更摘要）。派生数据，不可编辑，随 Base 变更整体重生成。**全文 Lens（按 Block 投影）为 P1**，对象定义保留 |
 | **Block** | 文档的最小锚定单元（标题、段落、列表、代码块、表格）。评论与 Lens 段落都锚定到 Block |
 | **Comment** | 挂在 Block 上的评论线程。类型：提问 / 修改要求 / 决策（approve · reject） |
 | **Card（理解卡片）** | 用户手写的原子笔记，用自己的语言。可双链到 Document / Clip / Card |
-| **Clip（剪藏）** | Chrome 插件抓取的网页内容，净化后的 Markdown + 元数据 |
+| **Clip（剪藏）** | Chrome 插件抓取的网页内容，净化后的 Markdown + 元数据（v0.3 起随 F6 为 P1，数据模型保留） |
+| **Xref（跨项目引用，v0.3 新增）** | Workspace 级引用关系：`src(project, doc, block?) → target(project, doc, block?)`，`link_type ∈ references / depends-on / contract-of`；存 sidecar，不污染源文件 |
+| **Contract（契约标记，v0.3 新增）** | 任一 Document 可标记为契约（API spec、数据模型、协议约定）；下游项目按文档或 Block 粒度订阅，变更命中订阅即触发漂移警示 |
 | **Context Pack** | 用户勾选文档/卡片/剪藏后组装的、给 AI 的紧凑上下文包 |
 | **Feedback Bundle** | 一次「回流」导出的结构化评论包，供 agent 消费 |
 
@@ -59,11 +61,12 @@ P1 独立 vibe coder（中文母语，用 Claude Code / Cursor 开发，首要�
 
 ```
 Workspace ─ 1:N ─ Project ─ 1:N ─ Document ─ 1:N ─ Block ─ 1:N ─ Comment
-                     │                │
-                     │                └─ 1:1 ─ Lens（按 Block 分段投影）
-                     ├─ 1:N ─ Card ──双链──> Document / Clip / Card
-                     ├─ 1:N ─ Clip
-                     └─ 1:N ─ Context Pack / Feedback Bundle
+    │                │                │
+    │                │                └─ 1:1 ─ Digest（速读区；全文 Lens 为 P1）
+    │                ├─ 1:N ─ Card ──双链──> Document / Clip / Card（候选跨项目）
+    │                ├─ 1:N ─ Clip（P1）
+    │                └─ 1:N ─ Context Pack / Feedback Bundle
+    └─ 1:N ─ Xref（跨项目引用/订阅：Document/Block × 任意两个 Project）
 ```
 
 ### 2.3 主导航（桌面端）
@@ -72,8 +75,8 @@ Workspace ─ 1:N ─ Project ─ 1:N ─ Document ─ 1:N ─ Block ─ 1:N ─
 
 1. **文档（Docs）**：项目文档树（镜像磁盘目录结构），徽标显示未读变更数、未解决评论数
 2. **卡片（Cards）**：理解卡片列表/搜索
-3. **剪藏（Clips)**：剪藏收件箱
-4. 顶部全局：**待你处理（Inbox）**——聚合"新变更待 review、AI 已修改待复核、评论被回应"三类事项。**Inbox 是日常主入口**，产品的节奏是"打开 → 清 Inbox → 关掉"。
+3. **剪藏（Clips)**：剪藏收件箱（v0.3 起随 F6 为 P1）
+4. 顶部全局：**待你处理（Inbox）**——**跨项目聚合**（v0.3 修订）"新变更待 review、AI 已修改待复核、评论被回应、上游契约变更（v0.3 新增）"四类事项。**Inbox 是日常主入口**，产品的节奏是"打开 → 清 Inbox → 关掉"。
 
 ### 2.4 Block 锚定机制（关键技术约定）
 
@@ -81,16 +84,17 @@ Workspace ─ 1:N ─ Project ─ 1:N ─ Document ─ 1:N ─ Block ─ 1:N ─
 - 每个 Block 有稳定 ID：内容哈希 + 位置启发式。Base 更新时用 diff 匹配算法（内容相似度 + 相对位置）迁移 Block ID，尽量保持评论与 Lens 锚点存活。
 - 锚点迁移置信度低于阈值时，评论降级为「文档级评论」并标记"原位置已变化，请确认"，**绝不静默丢失**。
 - Block ID 不写入用户的 Markdown 源文件（保持文件干净），存在 PrismDocs 本地库中（sidecar 存储）。
+- 锚定引擎的一次 Block 级 diff 计算供四方消费（v0.3 明确）：① 评论锚点迁移（F3）；② 被评 Block 命中判定（F4 兜底回收）；③ 变更高亮与速读区重生成触发（F2）；④ 跨项目订阅命中判定（F8）。
 
 ### 2.5 OKF 兼容约定（v0.2 新增，架构级决策）
 
 Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog) 的核心约定，使 PrismDocs 知识库可被任何 OKF 消费方直接读取（无锁定承诺，见 BRD §5 定位语）：
 
 - **文件即概念**：一个 Markdown 文件一个概念，文件路径即身份——与现有 Document/Card/Clip 模型天然同构。
-- **YAML frontmatter**：识别并管理 `type`（必填）、`title`、`description`、`resource`、`tags`、`timestamp` 六个标准字段；PrismDocs 内部维护**受控 type 词表**（吸取社区对 OKF"词表未注册"的批评）：`Spec` / `Plan` / `Architecture` / `Decision` / `Runbook` / `Card` / `Clip` / `ContextPack` / `Doc`（缺省），可扩展但需在设置中登记。
+- **YAML frontmatter**：识别并管理 `type`（必填）、`title`、`description`、`resource`、`tags`、`timestamp` 六个标准字段；PrismDocs 内部维护**受控 type 词表**（吸取社区对 OKF"词表未注册"的批评）：`Spec` / `Plan` / `Architecture` / `Decision` / `Runbook` / `Contract`（v0.3 新增） / `Card` / `Clip` / `ContextPack` / `Doc`（缺省），可扩展但需在设置中登记。
 - **保留文件名**：`index.md`（目录导航）、`log.md`（变更编年史）按 OKF 语义处理。
 - **不污染原则不变**：用户源文件没有 frontmatter 时**不强制写入**；PrismDocs 的元数据存 sidecar，仅在「导出 OKF Bundle」（REQ-7.6）时物化为合规 frontmatter。用户文件已有 frontmatter 时解析入库并保持往返一致（round-trip 不破坏）。
-- 跨文档引用使用标准 Markdown 链接（已是现状），导出后目录即可被 OKF 工具解析为图。
+- 跨文档引用使用标准 Markdown 链接（已是现状），导出后目录即可被 OKF 工具解析为图。跨项目引用（Xref）导出时重写为 bundle 间相对链接，`link_type` 物化为扩展字段 `x-link-type`（对 OKF"链接无类型"批评的产品级补齐）；Workspace 导出 = bundle-of-bundles，每项目一个 bundle（v0.3 新增）。
 
 ---
 
@@ -131,46 +135,46 @@ Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://git
 
 ---
 
-### F2 · Lens 层生成（口语化投影）
+### F2 · 速读区生成（中文理解层，v0.3 修订）
 
-**用户故事**：作为读英文技术文档吃力的开发者，我打开任何一份 AI 写的文档，默认看到的是中文口语版，它告诉我"这文档讲了什么、AI 做了什么取舍、哪里需要我拍板"，我基本不用读英文原文。
+> **v0.3 范围修订**：MVP 交付**速读区**（文档级中文摘要层）；按 Block 的全文口语化投影（Lens）连同三视图、增量重投影、逐段失真报告整体降为 **P1**——原需求（REQ-2.1/2.4 及 REQ-2.6/2.8 的逐段部分）保留于子 PRD-F2 并标注 P1，回归条件见 BRD §6.1。本节 REQ 编号沿用 v0.2。
+
+**用户故事**：作为读英文技术文档吃力的开发者，我打开任何一份 AI 写的文档，头部的中文速读区告诉我"这文档讲了什么、AI 做了什么取舍、哪里需要我拍板、上次看后改了什么"；我按决策清单定位到具体段落（附英文原文摘录）做判断，基本不用通读英文全文。
 
 **需求细则**
 
-- REQ-2.1 投影粒度：按 Block 分段生成，Lens 段落与 Base Block 一一锚定；阅读视图支持三种模式切换：**仅 Lens（默认）/ 对照（左右分栏）/ 仅 Base**。
-- REQ-2.2 Lens 不是翻译，是「口语化重述 + 取舍标注」。生成 prompt 的产品要求：讲人话（目标：受过教育但非本领域的读者能懂）；压缩重复内容；**显式标出**：⚖️ 取舍决策、⚠️ 风险/待确认、❓ 需要用户决策的点。
-- REQ-2.3 文档头部自动生成「速读区」：3-5 句话摘要 + 需要决策的事项清单（链接到对应段落）。
-- REQ-2.4 增量重投影：Base 变更后，仅重新生成受影响 Block 的 Lens（含受上下文影响的相邻块，由 diff 决定），未变更部分复用缓存。
-- REQ-2.5 变更高亮：自上次用户「已读」标记以来发生变化的 Lens 段落显示变更条（新增/修改/删除），一键"标记本文档已读"。
-- REQ-2.6 忠实度保障：每个 Lens 段落可一键展开对应 Base 原文；含"需要决策"标记的段落**强制**附带 Base 原文摘录（BRD 风险对策）；Lens 段落提供「报告失真」按钮（数据回流用于 prompt 迭代，也是北极星护栏指标数据源）。
-- REQ-2.7 Lens 不可编辑（产品原则）。用户对 Lens 的一切不满通过评论表达。
-- REQ-2.8 生成状态：逐段流式渲染；失败段落显示重试按钮，不阻塞其他段落。
-- REQ-2.9 成本控制：投影调用显示预估 token；项目级设置"自动投影"或"手动触发投影"（默认：≤5k token 的文档自动，超过则提示）。
+- REQ-2.2（适配保留）：速读区不是翻译，是「口语化提炼 + 取舍标注」。生成要求：讲人话（受过教育但非本领域读者能懂）；**显式标出**：⚖️ 取舍决策、⚠️ 风险/待确认、❓ 需要用户决策的点；专有名词保留英文；❓ 宁缺毋滥（误报稀释注意力，对齐 BRD 警报疲劳约束）。
+- REQ-2.3（P0 核心）：速读区 = 3–5 句话摘要 + ❓ 需决策清单（每项链接跳转对应 Base Block）+ **自上次已读以来的变更摘要**（基于锚定 diff 生成，列出变更 Block 与一句话说明，v0.3 新增）。清单为空时显示"本次无需你决策"。
+- REQ-2.5（P0，v0.3 改挂 Base 视图）：以用户上次「标记已读」为基线，之后变化的 **Base Block** 显示变更条（新增/修改/删除；数据源为锚定引擎 diff，不依赖投影）；「标记本文档已读」一键清除并推进基线；未读变更数上报文档树徽标与 Inbox。
+- REQ-2.6（P0 部分保留）：❓ 决策清单项**强制**附 Base 原文摘录，不可隐藏（BRD 风险对策）；速读区整体提供「报告失真」入口（文档级；逐段版随全文 Lens P1）。
+- REQ-2.7（不变）：速读区只读，不可编辑；用户对内容的一切意见通过评论表达。
+- REQ-2.8（适配）：单次调用流式渲染；失败可重试、不损坏数据；同一文档同一时刻至多一个生成任务，重复触发合并。
+- REQ-2.9（适配）：生成前显示预估 token；项目级设置"自动生成 / 手动触发"（默认：≤5k token 的文档自动，超过则提示）；消耗计入全局 token 统计。
+- REQ-2.10（v0.3 新增）：缓存键 = 文档内容哈希 + prompt 版本 + 目标语言 + 模型标识；持久化，重启不重算（§5 可靠性）。
 
 **边界情况**
 
-- Base 本身是中文或混合语言 → 语言检测，中文内容跳过投影仅做速读区。
-- 代码块不投影，原样呈现，但其前后的解释文字要覆盖代码块的意图。
-- 表格投影保持表格结构，仅口语化单元格措辞。
-- API key 未配置/额度耗尽 → Lens 区显示引导卡片，Base 层阅读不受影响。
-- Base 在投影进行中再次变更 → 取消进行中任务，以最新版本重新调度。
+- Base 本身是中文或混合语言 → 跳过口语化提炼，仅生成决策清单与变更摘要。
+- 代码块不进入摘要重述，其意图由摘要文字覆盖。
+- API key 未配置/额度耗尽 → 速读区显示引导卡片，Base 层阅读、评论、卡片不受影响。
+- 生成进行中 Base 再次变更 → 取消进行中任务，以最新版本重新调度。
 
 **验收标准**
 
-- AC-2a：内测用户对"只看 Lens 能理解文档 80% 内容"的认同率 ≥70%。
-- AC-2b：修改 Base 中 1 个段落，重投影只调用受影响段落（可通过日志验证），10 秒内呈现。
-- AC-2c：所有"需要决策"段落均带 Base 原文摘录，无一例外。
-- AC-2d：失真报告率 <5%（内测期）。
+- AC-2a（v0.3 口径）：内测用户对"速读区 + 原文定位足以完成 review 决策"的认同率 ≥70%。
+- AC-2b（v0.3 口径）：Base 变更后速读区在防抖窗口后自动重生成；重启应用打开已生成文档 0 次 LLM 调用（缓存持久化）；变更条与锚定 diff 逐块一致。
+- AC-2c（不变）：所有 ❓ 决策清单项均带 Base 原文摘录，无一例外。
+- AC-2d（适配）：失真报告率 <5%（内测期）；❓ 精确率 ≥90%（M0 评测集）。
 
 ---
 
 ### F3 · 段落级评论
 
-**用户故事**：作为 reviewer，我在中文 Lens 上圈出一段写下质疑或修改要求，就像在 Google Docs 上评论一样自然；这条评论会精确地落在英文 Base 的对应位置上。
+**用户故事**：作为 reviewer，我从速读区的决策清单跳到 Base 对应段落，圈出一段写下质疑或修改要求，就像在 Google Docs 上评论一样自然；评论精确锚定该 Block，AI 大改后也不丢。（全文 Lens 回归后，评论亦可在 Lens 段落上创建，经锚定映射到 Base。）
 
 **需求细则**
 
-- REQ-3.1 评论入口：在 Lens 或 Base 的任意 Block 上（悬停出现评论按钮 / 选中文字后浮条）；选中文字作为 quote 存入评论。
+- REQ-3.1 评论入口：在 Base 视图的任意 Block 上（悬停出现评论按钮 / 选中文字后浮条）；选中文字作为 quote 存入评论。（Lens 视图入口随全文 Lens P1。）
 - REQ-3.2 评论类型（创建时选择，默认"修改要求"）：
   - 💬 **提问**：期待 AI 回答而非改文档
   - ✏️ **修改要求**：期待 AI 修改 Base
@@ -189,7 +193,7 @@ Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://git
 
 **验收标准**
 
-- AC-3a：在 Lens 段落上创建的评论，在对照视图中正确显示在 Base 对应 Block 旁。
+- AC-3a（v0.3 口径）：从速读区决策清单跳转后创建的评论，100% 锚定到正确的 Base Block。（对照视图验收随全文 Lens P1。）
 - AC-3b：AI 重写文档 50% 内容后，≥90% 的评论锚点正确迁移或显式降级，0 静默丢失。
 - AC-3c：评论创建 ≤2 次点击 + 输入。
 
@@ -211,7 +215,8 @@ Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://git
 - REQ-4.4 闭环回收：agent 通过 MCP 回执，或产品检测到 Base 变更命中被评论 Block → 评论状态转 needs-review，Inbox 通知；用户在变更高亮 + 评论上下文中复核 → resolve（计入北极星闭环数）或 reopen（可追评）。
 - REQ-4.5 「提问」类评论的回答：agent 经 MCP respond 的文字答复显示在评论线程内。
 - REQ-4.6 Bundle 历史：每次回流留档可查（哪些评论、何时、agent 是否回执）。
-- REQ-4.7 Agent 贡献溯源（v0.2 新增，P0）：每次 Base 变更记录触发来源（关联的 Feedback Bundle / MCP 回执方 / 外部未知变更），needs-review 复核界面展示"这次修改由谁、因哪条评论触发"；为 OKF v0.2 的 provenance 方向预留数据结构。借鉴 CoWiki 的问题意识：防止错误来源不明的内容进入共享上下文后被 agent 放大。
+- REQ-4.7 Agent 贡献溯源（v0.2 新增，P0）：每次 Base 变更记录触发来源（关联的 Feedback Bundle / MCP 回执方 / 外部未知变更），needs-review 复核界面展示"这次修改由谁、因哪条评论触发"；为 OKF v0.2 的 provenance 方向预留数据结构。借鉴 CoWiki 的问题意识：防止错误来源不明的内容进入共享上下文后被 agent 放大。（v0.3 注：复核界面为 **Base diff + 评论并排**，Lens 重投影列随全文 Lens P1。）
+- REQ-4.8 变更时间线与 Block 溯源（v0.3 新增，P0）：文档变更历史升级为**时间线视图**——每个版本节点展示 diff + 驱动它的评论线程 + agent 回执 + 执行者（REQ-4.7 数据的呈现层）；任意 Block 提供「这段为什么是这样」入口，展示该 Block 历次变更及各次的驱动评论/决策。约束：external-unknown 变更如实标注"来源不明"，不得造成因果链完备的错觉；被溯源记录引用的版本快照不参与存储淘汰（扩展 REQ-1.NEW-2 的 anchored 语义）。团队版扩展（多人身份、git 便携共享时间线）为 P1。
 
 **边界情况**
 
@@ -239,8 +244,8 @@ Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://git
   - 创建界面 placeholder：「你会怎么向朋友解释这件事？」
   - 从文档/剪藏选中文字"存为卡片"时，选中内容进入**引用区（折叠展示，标注来源链接）**，正文必须另写；正文为空或与引用高度重复时发布前柔性提醒（不强制阻止）
   - 卡片正文不提供 AI 代写按钮（刻意缺失；AI 仅可在发布后提供"复述质检"：指出你可能理解偏了的点——P0.5）
-- REQ-5.3 双链：`[[` 唤起联想选择文档/卡片/剪藏；反链面板显示"谁引用了这张卡"。
-- REQ-5.4 场景入口：评论 resolve 时提示"要为这个决策写张卡片吗？"（预填上下文链接）；文档/剪藏阅读中选中文字 → 存为卡片。
+- REQ-5.3 双链：`[[` 唤起联想选择文档/卡片/剪藏，候选覆盖全 Workspace（跨项目，v0.3 落实子 PRD-F5 OQ-5.2 倾向）；反链面板显示"谁引用了这张卡"。
+- REQ-5.4 场景入口：评论 resolve 时提示"要为这个决策写张卡片吗？"（预填上下文链接）；文档（Base 视图）阅读中选中文字 → 存为卡片，引用区存 Base 原文（剪藏入口随 F6 P1）。
 - REQ-5.5 「注入上下文」开关：卡片可标记为 context-worthy，被 F7 上下文组装默认拾取；此类卡片建议附英文一句话版本（AI 可代译此格式化字段——与"正文不代写"不冲突，正文是给人的，注入行是给 AI 的）。
 - REQ-5.6 列表与全文搜索、按标签/项目/链接对象筛选。
 
@@ -257,7 +262,9 @@ Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://git
 
 ---
 
-### F6 · Chrome 剪藏插件
+### F6 · Chrome 剪藏插件（v0.3 起为 P1，MVP 不交付）
+
+> **v0.3 决议**：F6 整体移出 MVP——重述后的三个核心 job（集中管理理解、评论透明、跨项目防偏差）均不涉及外部网页素材，且它是唯一可完整剥离的独立工程线。需求全文保留于本节与子 PRD-F6，P1 第一批交付；BRD M3 的 Chrome 商店引流随之后置。
 
 **用户故事**：作为开发者，我看到一篇讲 SQLite 并发的好文章，点一下插件就把它存成干净的 Markdown 进了知识库，代码块完好，还看得到它值多少 token；下次让 AI 参考它时不用再手工清理。
 
@@ -292,7 +299,7 @@ Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://git
 
 **需求细则**
 
-- REQ-7.1 组装器：树形勾选文档（Base 层）/ 卡片（注入行优先，正文可选）/ 剪藏（可选"AI 压缩版"——生成英文要点摘要以省 token，P0.5）；实时显示总 token 及各项占比。
+- REQ-7.1 组装器：树形勾选文档（Base 层）/ 卡片（注入行优先，正文可选）/ 剪藏（随 F6 P1，含"AI 压缩版"）；**作用域为 Workspace 级（v0.3 修订）**：可勾选其他项目的文档，典型用法是 client 的 Pack 带上 server 的契约文档；实时显示总 token 及各项占比。
 - REQ-7.2 输出：写入 `.prismdocs/context/<name>.md`，结构化（来源标注、分节），纯英文倾向（中文卡片正文附机器英译或原文保留，用户可选）。
 - REQ-7.3 常用包可保存为模板（如"架构决策包"），文档更新后重新生成时提示内容已变化。
 - REQ-7.4 context-worthy 卡片默认预勾选。
@@ -309,6 +316,34 @@ Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://git
 - AC-7a：生成的 Pack 被 Claude Code 通过文件引用或 MCP 消费，实际可用。
 - AC-7b：token 显示误差 ≤10%。
 - AC-7c：从打开组装器到生成完成 ≤60 秒（不含可选 AI 压缩）。
+
+---
+
+### F8 · 跨项目知识层（v0.3 新增）★ 防偏差
+
+**用户故事**：作为同时维护 server 和 client 两个仓库的开发者，我把 server 的 API spec 标记为契约、在 client 项目订阅它；server 侧 agent 改了接口文档后，client 的 Inbox 立即提醒我"上游契约变更"，我一键生成核对反馈交给 client 侧 agent，两个仓库不再悄悄漂移。
+
+**需求细则**
+
+- REQ-8.1 跨项目引用（Xref）：建立方式——① 应用内显式建链（文档/Block 上「引用其他项目文档」动作）；② 卡片 `[[` 双链跨项目候选（同 REQ-5.3）；③ 自动发现（P0.5）：正文中指向另一已导入项目文件的相对路径 / repo URL 链接，提示确认后收编为 Xref。引用关系存 sidecar（`link_type ∈ references / depends-on / contract-of`），不污染源文件；Block 级引用复用 §2.4 锚定机制，随锚点迁移，置信度低时显式降级警示（与评论同一"0 静默丢失"契约）。
+- REQ-8.2 契约标记与订阅：任一 Document 可标记为契约（type 词表 `Contract` 或标志位）；下游项目显式订阅，粒度可到 Block（如仅订阅某一接口章节）。**订阅制是警报疲劳的第一道闸：仅订阅命中的变更才产生跨项目警示。**非 Markdown 契约（openapi.yaml、proto 等）以附件级纳入：文件级订阅，不做 Block 级。
+- REQ-8.3 漂移警示：上游契约变更且锚定 diff 命中被订阅 Block → 下游项目 Inbox「上游契约变更」事项：上游 diff 摘录 + 变更溯源（复用 REQ-4.7：哪个 agent / Bundle 触发）+ 受影响的下游引用方清单；同一契约的多处变更聚合为一条（对齐 REQ-1.5.2 批量模式精神）。MVP 只做结构信号；语义漂移检测（LLM 比对上下游断言矛盾）为 P1。
+- REQ-8.4 一键下游核对反馈：从警示一键在**下游项目**生成 Feedback Bundle——内容 = 上游变更 diff 摘录 + 指令头（"上游契约 X 节已变更，核对本项目文档与实现是否需要跟进，逐条回执"）——走 F4 既有双通道交付与三信号回收；复核 resolve 计入北极星闭环。**漂移修复复用评论闭环，agent 侧零新协议。**
+- REQ-8.5 OKF 对齐：Xref 导出时重写为 bundle 间相对链接，`link_type` 物化为 `x-link-type` 扩展字段（见 §2.5）。
+
+**边界情况**
+
+- 上游契约文档被删除/重命名 → 订阅随 F1 身份识别迁移；删除时下游警示"契约源已删除"，订阅转失效态（保留记录，不静默消失）。
+- 订阅的 Block 被拆分/合并 → 随锚点迁移；置信度低 → 警示"订阅段落已大幅变化，请重新确认订阅范围"。
+- 上游变更由同一用户在上游的评论回流触发 → 警示仍产生，但标注"由你在上游的评论触发"，可一键静默。
+- 同一契约被多个下游订阅 → 各下游独立警示、独立核对 Bundle。
+- 循环引用（A 订 B、B 订 A）→ 允许；核对 Bundle 不自动级联生成（防警示风暴，人工逐环确认）。
+
+**验收标准**
+
+- AC-8a：server/client 双仓真实场景跑通"上游契约变更 → 下游警示（FS 呈现预算 10s 内）→ 一键核对 Bundle → 下游 agent 处理 → 复核 resolve"全链路。
+- AC-8b：未订阅的上游变更 0 跨项目警示（订阅制过滤有效）；警示误报率 <10%（内测观察）。
+- AC-8c：上游文档被 agent 大规模重写后，订阅与 Xref 随锚点 ≥90% 正确迁移或显式降级，0 静默丢失（复用 AC-3b 测试集）。
 
 ---
 
@@ -338,6 +373,9 @@ Base 层的存储与导出遵循 [Google Open Knowledge Format v0.1](https://git
 | `get_context_pack(name)` | agent→读 | 拉取上下文包 |
 | `list_cards(filter)` | agent→读 | 检索 context-worthy 卡片（P0.5） |
 | `export_okf_bundle(selection)` | agent→读 | 导出 OKF bundle（P1，v0.2 新增，同 REQ-7.6 的 MCP 形态） |
+| `list_dependencies(path)` / `get_upstream_contracts()` | agent→读 | 本项目的上游契约与跨项目引用（P1，v0.3 新增；MVP 用 Context Pack 承载跨项目上下文） |
+
+传输（v0.3 明确，决策 D-07）：MCP server 由桌面应用自身托管——loopback streamable HTTP（`127.0.0.1:<port>`），per-install bearer token（存系统钥匙串）+ 非空 Origin allowlist，无子进程；配套一个轻量 CLI helper 承担 Claude Code `headersHelper`（从钥匙串读 token）与 SessionStart hook 的 check-feedback 提示。**子 PRD-F4 中早期的 stdio 代理方案（REQ-4.NEW-1）作废，以本条为准。**
 
 安全：MCP 仅本地回环、仅暴露当前 Workspace 数据、写操作限于评论回执（agent 不能创建/删除评论与卡片）。
 
@@ -357,8 +395,8 @@ MVP 验证矩阵：Claude Code（MCP + hook，一级支持）；Cursor（MCP + �
 | 密钥 | API key 存系统钥匙串；支持自定义 base_url（兼容代理/本地模型） |
 | 成本可见 | 全局设置页显示本月投影/摘要等各类 LLM 调用的 token 消耗统计 |
 | 可靠性 | LLM 调用全部可重试、失败不损坏数据；投影缓存持久化，重启不重算 |
-| 国际化 | UI 首发中文；Lens 目标语言架构上可扩展（P1 加日/英） |
-| 平台 | macOS（Apple Silicon）首发；Windows P1；Chrome 扩展 MV3（Edge 兼容顺带） |
+| 国际化 | UI 首发中文；速读区/Lens 目标语言架构上可扩展（P1 加日/英） |
+| 平台 | macOS（Apple Silicon）首发；Windows P1；Chrome 扩展 MV3（Edge 兼容顺带，随 F6 为 P1） |
 
 ---
 
@@ -368,9 +406,11 @@ MVP 验证矩阵：Claude Code（MCP + hook，一级支持）；Cursor（MCP + �
 |---|---|
 | `loop_closed`（评论 resolve 且此前经过 sent/needs-review） | 北极星：闭环数/周 |
 | `first_loop_closed`（注册后首次） | 激活：7 日内 ≥40% |
-| `lens_generated` / `lens_fidelity_report` | 失真率 <5% |
+| `digest_generated` / `digest_fidelity_report`（v0.3 改速读区口径） | 失真率 <5%；❓ 精确率评估 |
+| `xref_created` / `contract_subscribed` / `drift_alert_shown` / `drift_alert_resolved` / `drift_feedback_sent`（v0.3 新增） | 漂移警示处理率 ≥60%、误报率 <10%；跨项目采用度 |
+| `timeline_viewed` / `block_provenance_viewed`（v0.3 新增） | 变更时间线使用率（透明价值验证） |
 | `card_created`（区分入口） | 卡片/人/周 ≥3 |
-| `clip_created` / `clip_used_in_pack` | 剪藏引用率 ≥25% |
+| `clip_created` / `clip_used_in_pack`（随 F6 为 P1） | 剪藏引用率 ≥25%（P1 生效） |
 | `feedback_bundle_sent` / `bundle_no_response_48h` | 闭环漏斗诊断 |
 | 周活跃（打开且有 ≥1 次实质操作） | W4 留存 ≥30% |
 
@@ -378,8 +418,8 @@ MVP 验证矩阵：Claude Code（MCP + hook，一级支持）；Cursor（MCP + �
 
 ## 7. MVP 发布标准（Release Criteria）
 
-1. F1–F7 全部 P0 REQ 完成，全部 AC 通过（P0.5 项允许降级并记录）。
-2. 端到端闭环（AC-4a）在 3 个真实项目、Claude Code 与 Cursor 两种 agent 上验证通过。
+1. F1–F5、F7、F8 全部 P0 REQ 完成，全部 AC 通过（P0.5 项允许降级并记录；F2 按 v0.3 速读区口径；F6 不在发布标准内）。
+2. 端到端闭环（AC-4a）在 3 个真实项目、Claude Code 与 Cursor 两种 agent 上验证通过；跨项目链路（AC-8a）在 server/client 双仓场景验证通过。
 3. 锚点迁移专项测试：AI 大规模重写场景下评论 0 静默丢失（AC-3b）。
 4. 20 名内测用户完成 M2 内测，北极星与护栏指标数据可采集。
 5. 崩溃率 <1%，无数据丢失类 P0 bug。
@@ -390,13 +430,15 @@ MVP 验证矩阵：Claude Code（MCP + hook，一级支持）；Cursor（MCP + �
 
 | # | 问题 | 倾向 |
 |---|---|---|
-| Q1 | Lens 投影用哪档模型？（成本 vs 口语质量） | 快速模型打底 + "需要决策"段落用强模型复核；M0 阶段 A/B |
+| Q1 | 速读区生成用哪档模型？（成本 vs 口语质量；v0.3 自"Lens 投影"缩围） | 快速档单调用起步；M0 用 ❓ 精确率 / 忠实度 / 成本三维评测定档 |
 | Q2 | Base 层允许在 PrismDocs 内编辑（REQ-1.6）是否与"评论驱动"原则打架？ | 保留但入口弱化（默认只读，显式解锁），观察内测行为 |
 | Q3 | 评论/卡片存 sidecar（当前方案）还是同步进 git？（换机器/团队场景） | MVP sidecar + 导出备份；git 同步作为 P1"便携模式" |
 | Q4 | 剪藏原文的版权边界（整页存储） | 个人本地使用属合理范围；P1 云同步/分享前需法务审视 |
 | Q5 | 产品名 | **已定名 PrismDocs**（2026-07-26 选定，取"棱镜"隐喻：一份 Base 层折射出 Lens、卡片等多个谱层）。遗留动作：上线前完成域名/商标终检——已知弱碰撞：Prism Software 商标邻近、同名个人项目、arXiv 的 DocPrism 论文 |
 | Q6 | 受控 type 词表的范围与扩展策略（v0.2 新增）：九个内置 type 是否足够？用户自定义 type 如何避免重蹈 OKF"词表失控"？ | 内置词表 + 设置内登记制起步；观察内测 |
 | Q7 | 是否提供"frontmatter 直写入源文件"模式（v0.2 新增）：与"不污染用户文件"原则的权衡；agent 可能更希望源文件自带元数据 | 默认 sidecar；提供项目级 opt-in 开关的方案进设计评审 |
+| Q8 | 契约订阅的默认粒度（整文档 vs 引导选 Block）与警示聚合窗口（v0.3 新增） | 默认整文档订阅 + 引导标注关键章节；聚合窗口对齐 F1 批量模式；M0 走查校准 |
+| Q9 | 团队版共享机制：评论/溯源 sidecar 走 git 便携模式还是同步服务？（v0.3 新增，关联 Q3） | 团队版第一步走 git 便携模式（零服务端，repo 权限即评论权限，变更时间线随 git 同步）；同步服务后置 |
 
 ---
 
@@ -407,12 +449,15 @@ MVP 验证矩阵：Claude Code（MCP + hook，一级支持）；Cursor（MCP + �
 | v0.1 | 2026-07-26 | 初稿 |
 | v0.2 | 2026-07-26 | 合并《补充调研：CoWiki 与 OKF》P1–P8：新增 §2.5 OKF 兼容约定（含受控 type 词表）；F1 新增 REQ-1.8 frontmatter 解析、REQ-1.9 log.md 物化；F4 新增 REQ-4.7 Agent 贡献溯源；F7 新增 REQ-7.6 导出 OKF Bundle；§4 协议声明 OKF、MCP 增 export_okf_bundle（P1）；P1 功能池增入库冲突检测；§8 新增 Q6/Q7。**注**：七份子 PRD 的 23 条 REQ-x.NEW 回填评审留待 v0.3 |
 | v0.2.1 | 2026-07-26 | 产品定名 PrismDocs（关闭 Q5），全文档集占位名 VibeDocs → PrismDocs，协议目录 `.vibedocs/` → `.prismdocs/` |
+| v0.3 | 2026-07-28 | 构想 v2 合并（上游 BRD v0.3；依据《调研_整体构想v2_多项目知识层》《调研_技术基建与开发Phase》v0.2）：①F2 修订为速读区（REQ-2.2/2.3/2.5/2.6/2.7/2.8/2.9 适配保留、新增 REQ-2.10 缓存；REQ-2.1/2.4 及三视图/逐段流式/逐段失真降 P1；AC-2a/2b/2d 换口径）；②新增 §3-F8 跨项目知识层（REQ-8.1～8.5、AC-8a/8b/8c），领域对象增 Xref/Contract，type 词表增 `Contract`，§2.4 明确锚定四消费方；③F6 整体降 P1（§1.3/§2.3/§3-F6/§5/§7）；④新增 REQ-4.8 变更时间线与 Block 溯源，REQ-4.7 复核界面改 Base diff + 评论并排；⑤F7 升级 Workspace 作用域；⑥F5 双链跨项目化、存卡入口改 Base 视图；⑦§4.2 明确 MCP 传输 D-07（作废子 PRD-F4 REQ-4.NEW-1 的 stdio 方案）、工具面预留 `list_dependencies`/`get_upstream_contracts`（P1）；⑧§6 埋点、§7 发布标准同步；⑨Q1 缩围，新增 Q8/Q9。注：本版已实质依赖子 PRD 的 REQ-1.NEW-1/2（文档身份、版本快照）与 REQ-7.NEW-1（token 预算），视为已采纳；其余 REQ-x.NEW 逐条 triage 仍待进行 |
 
 ---
 
 ## 10. 后续文档
 
-- 设计规格（UI/UX Spec）：Inbox、阅读三视图、评论交互的高保真设计
-- 技术设计文档：Block 锚定迁移算法、增量投影调度、MCP server
-- M0 概念验证方案（BRD 里程碑）：手工流程脚本 + 5 用户访谈提纲
-- Chrome 扩展单独的商店上架材料
+- 子 PRD-F8（跨项目知识层，按主 PRD §3-F8 展开）；子 PRD-F2 v0.2（速读区拆分与全文 Lens P1 标注）；子 PRD-F4 v0.3（MCP 传输改 D-07、复核界面修订）
+- 设计规格（UI/UX Spec）：Inbox（跨项目聚合）、速读区 + Base 阅读视图、评论交互、变更时间线、复核界面（Base diff + 评论并排）
+- 技术设计文档：Block 锚定迁移契约（四消费方接口，第一优先）、MCP server（D-07）、速读区生成调度
+- M0 概念验证方案（BRD 里程碑）：三赛道方案 + 5 用户访谈提纲（含多仓开发者筛选）
+- 团队版方向文档（P1）：因果可追溯——共享变更时间线、身份体系、git 便携模式（关联 Q9）
+- Chrome 扩展单独的商店上架材料（随 F6 P1）

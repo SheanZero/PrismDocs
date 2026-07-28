@@ -2,9 +2,11 @@
 
 | 层级 | 文档 | 文件 | 版本 |
 |---|---|---|---|
-| L1 商业 | BRD：面向 Vibe Coding 的双层文档管理应用 | `BRD_PrismDocs_MVP.md` | **v0.2** |
-| L2 产品总纲 | 主 PRD（信息架构 / OKF 兼容约定 / F1–F7 需求总述 / agent 协议 / 非功能 / 发布标准） | `PRD_PrismDocs_MVP.md` | **v0.2** |
+| L1 商业 | BRD：面向 Vibe Coding 的双层文档管理应用 | `BRD_PrismDocs_MVP.md` | **v0.3** |
+| L2 产品总纲 | 主 PRD（信息架构 / OKF 兼容约定 / F1–F8 需求总述 / agent 协议 / 非功能 / 发布标准） | `PRD_PrismDocs_MVP.md` | **v0.3** |
 | L2 调研 | 补充调研：CoWiki 与 OKF 对 BRD/PRD 的影响（v0.2 变更依据） | `调研补充_CoWiki与OKF对BRD_PRD的影响.md` | v0.1 |
+| L2 调研 | 技术基建与开发 Phase 划分（含 MVP′ 速读区修订，v0.3 变更依据） | `调研_技术基建与开发Phase.md` | v0.2 |
+| L2 调研 | 整体构想 v2：多项目知识层（F8 与 F6 降级的 v0.3 变更依据） | `调研_整体构想v2_多项目知识层.md` | v0.1 |
 | L3 功能 | PRD-F1 项目与文档导入 | `sub-prds/PRD_F1_Import.md` | **v0.2** |
 | L3 功能 | PRD-F2 Lens 层生成（口语化投影） | `sub-prds/PRD_F2_Lens.md` | v0.1 |
 | L3 功能 | PRD-F3 段落级评论 | `sub-prds/PRD_F3_Comments.md` | v0.1 |
@@ -14,6 +16,8 @@
 | L3 功能 | PRD-F7 上下文组装 Context Pack | `sub-prds/PRD_F7_Context_Pack.md` | **v0.2** |
 
 **v0.2 变更范围**：合并 CoWiki/OKF 补充调研（BRD B1–B6、主 PRD P1–P8）。新增内容：主 PRD §2.5 OKF 兼容约定（受控 type 词表）、REQ-1.8/1.9（frontmatter 解析、log.md 物化）、REQ-4.7（Agent 贡献溯源）、REQ-7.6（导出 OKF Bundle）。F2/F3/F5/F6 不受本次变更影响，保持 v0.1。
+
+**v0.3 变更范围（2026-07-28，构想 v2）**：①F2 修订为速读区（全文 Lens 降 P1，回归条件见 BRD §6.1）；②新增 F8 跨项目知识层（契约订阅、漂移检测→闭环，主 PRD §3-F8）；③F6 剪藏整体降 P1；④新增 REQ-4.8 变更时间线；⑤MCP 传输定为 D-07（app 内嵌 loopback streamable HTTP，作废子 PRD-F4 REQ-4.NEW-1 的 stdio 方案）。**子 PRD 尚未同步 v0.3**，待更新：F2（拆分速读区）、F4（传输与复核界面）、F5（存卡入口/跨项目双链）、F6（P1 标注）、F7（Workspace 作用域）；待新建：PRD-F8。
 
 ## 编号约定
 
