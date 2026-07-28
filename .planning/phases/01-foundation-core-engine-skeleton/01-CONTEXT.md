@@ -53,7 +53,11 @@
 
 - **D-15:** **双族 provider 首发都要**：Anthropic + OpenAI 兼容（自定义 `base_url`，`async-openai` 覆盖代理/本地模型/长尾兼容端点）。
 - **D-16:** onboarding 做**一次轻量真实连接测试**（如 count_tokens / models / 极小 completion），把「钥匙串 → reqwest → 用户端点」整条路提前跑通。理由：LLM 边界是隐性风险点（SSE、错误处理、base_url 兼容性），骨架期用一次廉价测试摧实，比推到 Phase 4 才爆强。这同时字面验证 SC-1 / SC-3 / NFR-04。
-- **D-17:** **完整四步引导**：LLM 配置 → workspace 注册 → `.prismdocs/` 初始化 → MCP 协议片段。理由自洽于 D-07/D-10：既然 MCP 走固定端口 + 回写配置，协议片段必须在 Phase 1 存在，否则回环端点无从验证 SC-4。
+- **D-16a（2026-07-28，用户在 01-02 执行中下达，覆盖 D-16 的强制性）：** LLM 配置**不是**进入应用的必要条件，onboarding 第一步必须可 skip。D-16 的连接测试保留为**可用能力**，不再是通过 onboarding 的**门禁**。理由：用户不应为了看一眼产品而先去搞一把 API key。
+  - 保留：连接测试本身、双族 provider、keychain 落盘、base_url 归一化——全部不动。
+  - 变更：`StepLlmConfig` 增加 skip 出口；跳过后 onboarding 继续走第 2–4 步（workspace / `.prismdocs/` / MCP 协议片段都不依赖 LLM，SC-4 路径不受影响）。
+  - 代价（已知并接受）：D-16 原本要在骨架期摧毁的活链路风险（真实 base_url 兼容性、TLS、macOS Keychain、SSE）在用户实际配置 provider 之前不会被证伪。自动化套件覆盖了除**活调用**以外的每一环，所以残留缺口窄但真实——它降级为 phase 级 UAT 项，不再阻塞 phase 执行。
+- **D-17:** **完整四步引导**：LLM 配置 → workspace 注册 → `.prismdocs/` 初始化 → MCP 协议片段。理由自洽于 D-07/D-10：既然 MCP 走固定端口 + 回写配置，协议片段必须在 Phase 1 存在，否则回环端点无从验证 SC-4。**（受 D-16a 修正：第一步可跳过，四步结构不变。）**
 - **D-18:** 引导第二步的 workspace 注册**顺手只读枚举一遍默认 glob 下的 MD 文件**做可见反馈。**硬边界：只枚举，不解析 frontmatter、不建 FS watcher、不写入 documents 表。** glob 配置化、`.html` 转换、异常处理、增量同步、重命名识别全部仍归 Phase 2 F1 —— 本阶段不得实现，避免返工。
 - **D-19:** `.prismdocs/` 初始化包含骨架目录 + 自动生成的英文 `README.md`（向 agent 解释协议）+ `.gitignore` 建议（PRD §4.1）。feedback/context 的实际内容语义分别归 Phase 5 / Phase 7。
 
