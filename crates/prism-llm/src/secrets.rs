@@ -1,4 +1,98 @@
-// RED 阶段：实现尚未写下，本文件只有测试。GREEN 阶段在此之上补齐实现。
+//! INFRA-03 的**唯一密钥入口**：系统钥匙串的读写往返。
+//!
+//! ## 不变量
+//!
+//! 1. 密钥的唯一存放地是系统钥匙串。**绝不**写入 SQLite（含 `settings` 表）、
+//!    仓库内文件、`tauri.conf.json` 或任何会被「数据库单目录整体备份」带走的位置。
+//! 2. 钥匙串不可用或读取失败时**显式冒泡**，不回退到环境变量、dotfile 或任何
+//!    明文来源。一条看不见的降级路径会让「密钥只在钥匙串」的承诺变成假的（T-01-21）。
+//! 3. 持有密钥的类型不经 `Debug` / `Display` / 日志泄漏原文（T-01-04）。
+//!
+//! ## 命名契约
+//!
+//! `SERVICE` 与两个 `ACCOUNT_*` 是**跨二进制契约**：Phase 6 的 `prismdocs-helper`
+//! 必须用同一套名字读同一条目，写错要到 Phase 6 才暴露。改名等于让已安装用户的
+//! 密钥不可见。完整说明见 `docs/keychain-naming.md`。
+
+use crate::LlmError;
+use keyring_core::{Entry, Error};
+
+/// 钥匙串条目的 service 名。全应用（含 CLI helper）唯一。
+pub const SERVICE: &str = "PrismDocs";
+
+/// LLM API key 的 account 名。
+pub const ACCOUNT_LLM_KEY: &str = "llm_api_key";
+
+/// 本机 MCP loopback 宿主的 per-install bearer token 的 account 名（Phase 6 使用）。
+pub const ACCOUNT_MCP_TOKEN: &str = "mcp_bearer_token";
+
+/// 注册进程级默认 credential store（macOS 真实钥匙串）。
+///
+/// **应用启动时调用一次，且必须在创建任何 Entry 之前。**
+///
+/// 必须用 `keychain` 模块：PrismDocs 是直发公证 DMG、不进 App Sandbox、
+/// 无 provisioning profile，用另一个受 entitlement 约束的模块会在运行期报
+/// `-34018 A required entitlement isn't present`（RESEARCH Pitfall 2）。
+#[cfg(target_os = "macos")]
+pub fn init_default_store() -> Result<(), LlmError> {
+    keyring_core::set_default_store(apple_native_keyring_store::keychain::Store::new()?);
+    Ok(())
+}
+
+/// 写入 LLM API key。对同一 (service, account) 重复写入是幂等的——
+/// 底层 store 更新既有条目而不是追加一条。
+pub fn set_api_key(secret: &str) -> Result<(), LlmError> {
+    Entry::new(SERVICE, ACCOUNT_LLM_KEY)?.set_password(secret)?;
+    Ok(())
+}
+
+/// 读取 LLM API key。
+///
+/// 无条目时返回 `Ok(None)` 而不是 `Err`——D-06 要求「API key 可跳过，
+/// 无 key 应用照常启动」。其余错误一律冒泡：钥匙串被锁、权限被拒等情况
+/// 必须让调用方看见，不得被当成「没有 key」吞掉。
+pub fn get_api_key() -> Result<Option<String>, LlmError> {
+    // `keyring_core::Error` 是 #[non_exhaustive]，match 必须带 `_` 臂。
+    match Entry::new(SERVICE, ACCOUNT_LLM_KEY)?.get_password() {
+        Ok(secret) => Ok(Some(secret)),
+        Err(Error::NoEntry) => Ok(None),
+        Err(other) => Err(other.into()),
+    }
+}
+
+/// 删除 LLM API key。已不存在视为已删除，返回 `Ok(())`（幂等）。
+pub fn delete_api_key() -> Result<(), LlmError> {
+    match Entry::new(SERVICE, ACCOUNT_LLM_KEY)?.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(Error::NoEntry) => Ok(()),
+        Err(other) => Err(other.into()),
+    }
+}
+
+/// 内存中持有 API key 的 newtype。
+///
+/// **手写 `Debug` 输出固定占位串**，且**刻意不实现 `Display`**——后者的缺席
+/// 让 `format!("{key}")`、`println!("{key}")` 与 `tracing` 的 `%key` 直接编译失败，
+/// 而不是在运行期把密钥打进日志（Security Domain V7 / T-01-04）。
+/// 取原文的唯一途径是 [`ApiKey::expose`]，调用点因此在代码搜索中可见。
+pub struct ApiKey(String);
+
+impl ApiKey {
+    pub fn new(secret: impl Into<String>) -> Self {
+        Self(secret.into())
+    }
+
+    /// 取出密钥原文。仅用于构造出站请求头，取出后不得再存放到别处。
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for ApiKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ApiKey(<redacted>)")
+    }
+}
 
 #[cfg(test)]
 mod tests {

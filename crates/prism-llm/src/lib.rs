@@ -10,11 +10,27 @@ pub mod secrets;
 pub const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum LlmError {
     #[error("http error: {0}")]
     Http(#[from] reqwest::Error),
+
+    /// 钥匙串操作失败。
+    ///
+    /// **威胁模型 T-01-04（Information Disclosure）**：这里刻意只保留
+    /// `keyring_core::Error` 的 **Display 文本**，而不是错误值本身。该类型的
+    /// `Display` 已核实不含密钥（`BadEncoding` 只写 "not valid UTF-8"），但它
+    /// derive 出来的 `Debug` 会打印 `BadEncoding(Vec<u8>)` / `BadDataFormat(Vec<u8>, _)`
+    /// 携带的**原始密钥字节**——而 `unwrap()`、`expect()` 与 `tracing` 的 `?err`
+    /// 走的都是 `Debug`。带 payload 转发等于留一条泄漏通道。
     #[error("keychain error: {0}")]
-    Keyring(#[from] keyring_core::Error),
+    Keychain(String),
+}
+
+impl From<keyring_core::Error> for LlmError {
+    fn from(err: keyring_core::Error) -> Self {
+        Self::Keychain(err.to_string())
+    }
 }
 
 /// 发往用户配置的 LLM 端点时使用的 User-Agent。
