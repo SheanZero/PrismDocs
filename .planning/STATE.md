@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-07-28T23:13:39.476Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-07-28T23:28:41.754Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 9
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 4 of 9
+Plan: 5 of 9
 Status: Ready to execute
 Last activity: 2026-07-28 — Phase 01 execution started
 
-Progress: [███░░░░░░░] 33%
+Progress: [████░░░░░░] 44%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [███░░░░░░░] 33%
 | Phase 01 P01 | 39min | 3 tasks | 53 files |
 | Phase 01 P02 | 8min | 2 tasks | 8 files |
 | Phase 01 P03 | 68min | 2 tasks | 8 files |
+| Phase 01 P04 | 7min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,11 @@ Recent decisions affecting current work:
 - [Phase ?]: schema v1 定案方案 A：external-content FTS5 + rowid_pk 显式 INTEGER PRIMARY KEY + 三同步触发器 + STRICT 表，索引粒度保持默认全粒度（不声明该选项，降粒度会废掉 4 字中文 MATCH）
 - [Phase ?]: 只读池用 SQLITE_OPEN_READ_WRITE + query_only=ON 而非 READ_ONLY flags：只读连接在崩溃后 -shm 缺失时无法重建它
 - [Phase ?]: 「颠倒迁移与建池顺序」的行为反证实测不成立（六个并发测试仍全绿），改用 open.rs 内的源码顺序断言作为常驻哨兵
+- [Phase ?]: prism-types 的依赖上限就是 serde + thiserror 两项：它是 prism-mcp 与 prism-engine 的共同汇点，任何新增依赖会同时压到两侧（D-09）
+- [Phase ?]: service trait 一律同步（非 async）：底层 rusqlite 本就阻塞，同步 trait 天然 object-safe，consumer 用 spawn_blocking 调用
+- [Phase ?]: 跨边界转发第三方错误时只保留已核实安全的 Display 文本：keyring_core::Error 的 derive Debug 会打印原始密钥字节，而 unwrap()/tracing 的 ?err 走的正是 Debug
+- [Phase ?]: 持有密钥的类型手写 Debug 输出占位串，并刻意不实现 Display——缺席让 format!("{key}") 成为编译错误而非运行期泄漏
+- [Phase ?]: 钥匙串 service/account 命名（PrismDocs / llm_api_key / mcp_bearer_token）是跨二进制契约，固化于 docs/keychain-naming.md；prismdocs-helper 因 D-10 必须自带字面量副本
 
 ### Pending Todos
 
@@ -106,6 +112,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T23:13:31.593Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-07-28T23:28:33.078Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
