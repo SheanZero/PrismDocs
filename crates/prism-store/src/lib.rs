@@ -4,28 +4,19 @@
 //! WAL / pragma 套餐 / 迁移 / 只读池是 plan 03 的 writer-first 六步序，
 //! 此处刻意留空位，不预先猜测其形态。
 
+pub mod error;
+pub mod migrations;
+
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use rusqlite::Connection;
 
+pub use error::StoreError;
+
 /// sidecar 数据根的目录名（D-13：`~/Library/Application Support/PrismDocs/`）。
 const DATA_DIR_NAME: &str = "PrismDocs";
 const DB_FILE_NAME: &str = "prismdocs.db";
-
-#[derive(Debug, thiserror::Error)]
-pub enum StoreError {
-    #[error("io error at {path}: {source}")]
-    Io {
-        path: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-    #[error("sqlite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
-    #[error("could not resolve the platform data directory")]
-    NoDataDir,
-}
 
 /// sidecar 数据根。**必须**来自 `dirs::data_dir()`——Tauri 的等价 API 会让本 crate
 /// 依赖 tauri，违反 D-01。
@@ -49,10 +40,7 @@ impl Store {
     /// writer-first 六步序，顺序有语义，不能在这里提前猜。
     pub fn open(db_path: &Path) -> Result<Store, StoreError> {
         if let Some(dir) = db_path.parent() {
-            std::fs::create_dir_all(dir).map_err(|source| StoreError::Io {
-                path: dir.to_path_buf(),
-                source,
-            })?;
+            std::fs::create_dir_all(dir)?;
         }
         let writer = Connection::open(db_path)?;
         Ok(Store {

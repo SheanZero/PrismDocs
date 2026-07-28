@@ -7,8 +7,15 @@ rust-version.workspace = true
 
 [dependencies]
 rusqlite = { workspace = true }
+r2d2 = { workspace = true }
+r2d2_sqlite = { workspace = true }
+rusqlite_migration = { workspace = true }
 dirs = { workspace = true }
+ulid = { workspace = true }
+blake3 = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
