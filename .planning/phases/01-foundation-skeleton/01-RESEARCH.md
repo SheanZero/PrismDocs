@@ -1040,31 +1040,53 @@ test-engine:
 | A5 | axum 0.8 `.layer()` 语义为"后加的先执行"（由内向外） | Pattern 4 | 若顺序理解反了，Host 校验会在 bearer 之后执行——两层都在、都会 403，安全性不变，仅错误码语义顺序不同。Phase 6 落地时以实测为准 |
 | A6 | Keychain service/account 命名 `PrismDocs` / `llm_api_key` / `mcp_bearer_token` | Runtime State Inventory | 命名是本阶段自定的契约，无外部约束；但必须在 Phase 1 写进文档，否则 Phase 6 CLI helper 会用另一套名字 |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> 全部五条已在计划阶段落定，各自的承载 plan 见每条末尾的 `RESOLVED:` 行。
+> 本节保留原始问题陈述以备复核——若执行期发现某条的前提不成立，回到这里改，
+> 不要在 plan 里悄悄改口径。
 
 1. **只读池 `max_size` 取值**
    - What we know: MVP 单用户、500 文档；WAL 下读不互斥；长驻读连接会阻塞 checkpoint 导致 `-wal` 膨胀（PITFALLS Pitfall 7）
    - What's unclear: 4 是拍脑袋值；真正的约束是"读连接用完即还"而非池大小
    - Recommendation: Phase 1 用 4，把「禁止跨事件循环长持有读连接」写进 `Store::read` 的闭包式 API（已在 Pattern 2 体现，API 形态本身就禁止长持有）。数值调优留到 Phase 8 压测
+   - **RESOLVED:** 采纳建议 —— `01-03-PLAN.md` Task 2 以常量 `READ_POOL_MAX_SIZE = 4` 落地，
+     并用闭包式 `Store::read` 从 API 形态上禁止长持有；`every_pooled_connection_is_query_only`
+     对池中每条连接分别断言。数值调优挂到 Phase 8（INFRA-04 压测）。
 
 2. **`cargo-nextest` vs `serial_test`**
    - What we know: 两者都能解决 Pitfall 1；nextest 隔离更彻底但引入工具链依赖且不跑 doctest
    - What's unclear: 项目是否会依赖 doctest 作为文档正确性保障
    - Recommendation: 本项目文档以 `.planning/` + `docs/` 为主、doctest 需求低 → **建议 nextest**，并在 CI 里额外跑一次 `cargo test --doc` 兜底。计划阶段拍板即可，成本对称
+   - **RESOLVED（未采纳建议，选了方案 b）:** `01-04-PLAN.md` Task 2 定为 **`serial_test`**。
+     理由是零工具链要求，且 `01-VALIDATION.md` 记录的全部命令都是纯 `cargo test`——引入 nextest
+     会让「记录的命令」与「实际跑的命令」分叉，而 Pitfall 1 用 `#[serial]` + `unset_default_store()`
+     已被完全覆盖。`cargo-nextest` 保留为可选加强手段写进 docs，不作为必需依赖
+     （`01-RESEARCH.md` § Environment Availability 已把它列为「未安装、有 fallback、不阻塞」）。
 
 3. **`STRICT` 表关键字**
    - What we know: schema 示例用了 `STRICT`（SQLite 3.37+，bundled 3.53.2 支持）；它把类型错误从静默转换变成运行期错误
    - What's unclear: 是否会与 Phase 2/3 某些动态列用法冲突
    - Recommendation: 用 `STRICT`。本项目所有列类型都明确，收益（类型错误早暴露）大于风险；若 Phase 3 确有需求，去掉 `STRICT` 是一次 `ALTER`-free 的表重建，代价可接受
+   - **RESOLVED:** 升级为**人工确认点** —— `01-03-PLAN.md` 的 `checkpoint:decision` 把 STRICT
+     与 external-content / 显式 rowid / 索引粒度打包成方案 A（推荐）对方案 B，由用户在写下
+     migration 001 之前拍板。不再由研究单方面决定，因为它与 migration 001 一同成为单向门。
 
 4. **冒烟页 Channel 样例的 `total`**
    - What we know: D-06 允许假数据流；有序性只在"快速连发"下才可能被违反
    - Recommendation: `total = 1000`，前端断言 `seq[i] === i` 且无缺口。这是 Claude's Discretion 范围内的选择
+   - **RESOLVED:** 采纳建议 —— `01-08-PLAN.md` Task 2 的 `SMOKE_DEFAULT_TOTAL = 1000` 与
+     `smoke_stream_seq_is_strictly_monotonic`（Rust 侧），`01-09-PLAN.md` Task 2 的冒烟页
+     以 `devSmokeStream(1000, …)` 收流并跑同一条 seq 校验（真实 WebView 侧）。两侧同口径。
 
 5. **`prism-fs`/`prism-parse`/`prism-anchor` 空骨架的"最小编译单元"内容**
    - What we know: D-08 要求它们建好且依赖声明齐全（让 `cargo tree -d` 覆盖真实依赖树）
    - What's unclear: 只写 `pub fn version() -> &'static str` 会不会因未使用依赖触发 `unused_crate_dependencies` lint
    - Recommendation: 每个 crate 写一个引用其主依赖的最小函数（如 prism-parse 写 `pub fn parse_smoke(md: &str) -> usize` 调 comrak 数一下 root 子节点），既保证依赖真的被链接进树，又给 Phase 2/3 一个起点
+   - **RESOLVED:** 采纳建议 —— `01-01-PLAN.md` Task 3 为六个 crate 各写一个真正调用其主依赖的
+     最小函数（`watcher_backend_name` / `root_block_count` / `content_fingerprint` / `user_agent` /
+     `protocol_version`），并以 `cargo tree -p <crate> | grep -c '^<主依赖> '` ≥1 的验收项断言
+     依赖真的进了树，而不是空声明。
 
 ## Environment Availability
 

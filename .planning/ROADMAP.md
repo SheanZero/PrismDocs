@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. 事件总线骨架各验证一条通路：一条总线事件经粗粒度 Tauri event 往返前端（notify-then-fetch），一条命令经 Channel 有序流式返回（A1）
   3. SQLite schema v1 落地：WAL + 单写者 + r2d2 读池（query_only=ON）并发读写正常；FTS5 中文查询返回非零结果（CJK tokenizer 在 schema v1 定案）；rusqlite_migration 迁移体系可用，bundled SQLite ≥3.51.3
   4. API key 经 keyring-core + apple-native-keyring-store 写入系统钥匙串并可读回，prism-llm 为唯一网络出口与唯一密钥入口，代码与配置中无明文密钥
-**Plans**: 9 plans（6 waves）
+**Plans**: 9 plans（7 waves）
 
 Plans:
 - [ ] 01-01-PLAN.md — 工作区骨架与端到端 tracer（React → Tauri → engine → store → SQLite）+ 全 crate 骨架

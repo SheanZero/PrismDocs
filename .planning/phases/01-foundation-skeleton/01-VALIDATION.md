@@ -25,6 +25,14 @@ created: 2026-07-28
 | **Quick run command** | `cargo test -p prism-types -p prism-store -p prism-llm -p prism-mcp -p prism-engine` |
 | **Full suite command** | `just check-dup && just check-tauri-free && just check-no-cycle && just check-single-egress && cargo test --workspace && npm run test` |
 | **Estimated runtime** | ~60 seconds (greenfield; re-measure after Wave 0) |
+| **Coverage** | Measured, not gated, in Phase 1 — `just coverage` (`cargo llvm-cov` + `vitest --coverage`). Rationale and the Phase-2 hard-gate handoff are recorded in `01-02-PLAN.md` Task 2. |
+
+> **Filter form (hard rule — a green that proves nothing is worse than a red).**
+> `cargo test -p <crate> <FILTER>` filters by **test name**, not by file name. A filter that names an
+> integration-test *file* matches zero tests and **still exits 0**. Select a file with `--test <file>`;
+> use a bare filter only when it is a substring of a real `fn` name (or of the `module::tests::fn`
+> path for in-module unit tests). Every bare filter in the tables below is a function or module name
+> that exists in the plan which defines it.
 
 ---
 
@@ -32,7 +40,7 @@ created: 2026-07-28
 
 - **After every task commit:** Run `cargo test -p <changed crate>` + `cargo clippy -p <changed crate> -- -D warnings`
 - **After every plan wave:** Run `just check-dup && just check-tauri-free && just check-no-cycle && just check-single-egress && cargo test --workspace`
-- **Before `/gsd-verify-work`:** Full suite green + the four manual smoke-page checks below
+- **Before `/gsd-verify-work`:** Full suite green + the four manual smoke-page checks below + `just coverage` run once and its two numbers recorded in the phase SUMMARY
 - **Max feedback latency:** 60 seconds
 
 ---
@@ -53,15 +61,18 @@ created: 2026-07-28
 | INFRA-01 | engine-only test suite green | integration | `cargo test -p prism-types -p prism-store -p prism-llm -p prism-mcp -p prism-engine` | ❌ W0 |
 | INFRA-01 | no duplicate rusqlite/reqwest/libsqlite3-sys | dependency assertion | `just check-dup` | ❌ W0 |
 | INFRA-01 | prism-mcp has no facade dependency (D-09) | dependency assertion | `just check-no-cycle` | ❌ W0 |
-| INFRA-01 | prism-mcp returns data through the injected trait | unit | `cargo test -p prism-mcp trait_injection` | ❌ W0 |
-| INFRA-01 | bus event → coarse payload mapping (incl. Lagged→Resync) | unit | `cargo test -p prismdocs-shell bus_adapter` | ❌ W0 |
-| INFRA-01 | Channel command invocable and returns Ok | integration (`tauri::test`) | `cargo test -p prismdocs-shell --features test ipc` | ❌ W0 |
+| INFRA-01 | prism-mcp returns data through the injected trait | integration | `cargo test -p prism-mcp --test trait_injection` | ❌ W0 |
+| INFRA-01 | bus event → coarse payload mapping (all three arms) | unit | `cargo test -p prismdocs-shell bus_adapter` (module-path filter; matches `bus_adapter::tests::*` and `bus_adapter_maps_event_to_emit` in either layout) | ❌ W0 |
+| INFRA-01 | Lagged→Resync specifically (the silent-failure arm) | unit | `cargo test -p prismdocs-shell lagged_maps_to_resync` | ❌ W0 |
+| INFRA-01 | Channel command invocable and returns Ok | integration (`tauri::test`) | `cargo test -p prismdocs-shell --features test --test ipc` | ❌ W0 |
+| INFRA-02 | project-scoped search isolation | integration | `cargo test -p prism-store --test fts_cjk search_is_scoped_to_project` | ❌ W0 |
 | INFRA-02 | migration set valid | unit | `cargo test -p prism-store migrations_are_valid` | ❌ W0 |
 | INFRA-02 | concurrent read/write under WAL, no BUSY | integration | `cargo test -p prism-store --test concurrency reader_snapshot_is_isolated` | ❌ W0 |
 | INFRA-02 | pooled connection cannot write (`query_only=ON`) | integration | `cargo test -p prism-store --test concurrency pooled_connection_cannot_write` | ❌ W0 |
 | INFRA-02 | bundled SQLite ≥3.51.3 | integration | `cargo test -p prism-store --test concurrency bundled_sqlite_meets_minimum` | ❌ W0 |
 | INFRA-02 | Chinese query returns non-zero rows (trigram) | integration | `cargo test -p prism-store --test fts_cjk chinese_query_returns_nonzero_rows` | ❌ W0 |
 | INFRA-02 | FTS index follows UPDATE/DELETE (triggers) | integration | `cargo test -p prism-store --test fts_cjk fts_index_follows_update_and_delete` | ❌ W0 |
+| INFRA-02 | index/content rowid stay aligned across VACUUM | integration | `cargo test -p prism-store --test fts_cjk search_survives_vacuum` | ❌ W0 |
 | INFRA-02 | `wal_checkpoint(TRUNCATE)` on close | integration | `cargo test -p prism-store --test concurrency wal_truncated_on_close` | ❌ W0 |
 | INFRA-03 | secret round-trip (mock store) | unit | `cargo test -p prism-llm roundtrip_with_mock_store` | ❌ W0 |
 | INFRA-03 | app starts with no key (`NoEntry` → `Ok(None)`) | unit | `cargo test -p prism-llm no_key_is_not_an_error` | ❌ W0 |
@@ -80,7 +91,7 @@ Greenfield project — test infrastructure is 100% absent. Wave 0 must establish
 - [ ] `package.json` + `vite.config.ts` + vitest config
 - [ ] `justfile` (4 dependency-direction assertions + `test-engine`) or equivalent `scripts/check-deps.sh`
 - [ ] `crates/prism-store/tests/concurrency.rs` — INFRA-02 WAL / query_only / version
-- [ ] `crates/prism-store/tests/fts_cjk.rs` — INFRA-02 Chinese hit + trigger sync
+- [ ] `crates/prism-store/tests/fts_cjk.rs` — INFRA-02 Chinese hit + trigger sync + VACUUM alignment + project scoping (4 test fns)
 - [ ] `migrations_are_valid` unit test inside `crates/prism-store/src/migrations.rs`
 - [ ] mock/real keyring tests in `crates/prism-llm/src/secrets.rs` (real path `#[ignore]`)
 - [ ] `crates/prism-mcp/tests/trait_injection.rs` — fake `FeedbackSource` impl
@@ -88,6 +99,7 @@ Greenfield project — test infrastructure is 100% absent. Wave 0 must establish
 - [ ] Pure-function mapping unit tests for `src-tauri/src/bus_adapter.rs` (incl. Lagged→Resync)
 - [ ] Isolation convention: every store test injects a `tempfile::TempDir` data root — must never touch the real `~/Library/Application Support/PrismDocs/`
 - [ ] Framework install: Rust harness is built in; `npm install -D vitest`; optionally `cargo install cargo-nextest`
+- [ ] Coverage tooling: `cargo llvm-cov` (CI installs it) + `@vitest/coverage-v8` — measured and reported, not gated, in Phase 1 (see `01-02-PLAN.md` Task 2)
 - [ ] CI workflow (GitHub Actions, macOS runner) wiring the per-wave commands
 
 ---
