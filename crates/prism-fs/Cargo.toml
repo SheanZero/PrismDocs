@@ -1,0 +1,11 @@
+[package]
+name = "prism-fs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+notify = { workspace = true }
+notify-debouncer-full = { workspace = true }
+thiserror = { workspace = true }

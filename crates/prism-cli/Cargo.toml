@@ -1,0 +1,17 @@
+[package]
+name = "prism-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "prismdocs-helper"
+path = "src/main.rs"
+
+# D-10：externalBin 要单独签名公证，依赖面必须小且**不含任何 prism-* engine crate**。
+[dependencies]
+reqwest = { workspace = true }
+keyring-core = { workspace = true }
+apple-native-keyring-store = { workspace = true }
+thiserror = { workspace = true }

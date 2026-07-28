@@ -1,0 +1,15 @@
+[package]
+name = "prism-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# D-09：只允许依赖 prism-types，**不得**依赖 prism-engine——
+# 编译期无 facade↔mcp 依赖环由 `cargo tree -p prism-mcp` 断言。
+[dependencies]
+prism-types = { workspace = true }
+rmcp = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }

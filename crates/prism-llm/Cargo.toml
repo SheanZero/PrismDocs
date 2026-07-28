@@ -1,0 +1,13 @@
+[package]
+name = "prism-llm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+reqwest = { workspace = true }
+keyring-core = { workspace = true }
+apple-native-keyring-store = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

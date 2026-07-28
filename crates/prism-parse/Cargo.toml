@@ -1,0 +1,10 @@
+[package]
+name = "prism-parse"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+comrak = { workspace = true }
+thiserror = { workspace = true }
