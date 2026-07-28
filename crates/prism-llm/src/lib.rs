@@ -4,6 +4,8 @@
 //! Phase 1 plan 01（D-08）只建立骨架与真实依赖声明——密钥读写、端点配置与
 //! SSE 流式解析是 plan 04 及后续 phase 的内容。
 
+pub mod secrets;
+
 /// crate 版本，供 UA 与诊断输出使用。
 pub const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
