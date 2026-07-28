@@ -5,5 +5,11 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+# prism-types 是依赖图的汇点：prism-mcp 与 prism-engine 都指向它，
+# 任何新增依赖都会同时压到两侧。这里**只允许** serde 与 thiserror（D-09）。
 [dependencies]
 serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
