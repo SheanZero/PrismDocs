@@ -8,6 +8,7 @@ pub mod error;
 pub mod migrations;
 mod open;
 pub mod search;
+pub mod settings;
 
 use std::path::PathBuf;
 
