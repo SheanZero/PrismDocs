@@ -2,6 +2,8 @@
 src-tauri/gen/schemas/
 node_modules/
 dist/
+coverage/
+lcov.info
 *.db
 *.db-wal
 *.db-shm

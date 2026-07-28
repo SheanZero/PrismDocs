@@ -1,0 +1,101 @@
+name: CI
+
+# 三个 job 都不依赖 `just`（CI 环境不预装）——断言逻辑的唯一实现是 scripts/ 下的脚本，
+# justfile 只是本机装了 just 时的等价简写。
+
+on: [push, pull_request]
+
+jobs:
+  # 依赖方向断言 + 密钥卫生 + engine 选择集的 lint/test/coverage。
+  engine:
+    name: engine
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, llvm-tools-preview
+
+      # 单一 workspace 下产物落在仓库根 target/；缓存指向 shell 子目录下的构建目录
+      # 会 miss（它已不存在），后果是每次全量重编。
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ./target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Dependency-direction assertions
+        run: bash scripts/check-deps.sh all
+
+      - name: Plaintext secret scan
+        run: bash scripts/check-secrets.sh
+
+      - name: Clippy (engine selection set)
+        run: cargo clippy -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine -- -D warnings
+
+      - name: Test (engine selection set)
+        run: cargo test -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine
+
+      - uses: taiki-e/install-action@cargo-llvm-cov
+
+      # Phase 1 只测量与呈报，不设 --fail-under —— 理由与 Phase 2 的交接见 01-02-SUMMARY.md
+      - name: Coverage (engine)
+        run: |
+          cargo llvm-cov --no-report --workspace
+          cargo llvm-cov report --summary-only | tee coverage-summary.txt
+          cargo llvm-cov report --lcov --output-path lcov.info
+          {
+            echo '### Engine coverage'
+            echo '```'
+            cat coverage-summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-coverage-lcov
+          path: lcov.info
+
+  # 单独一个 job：Tauri 薄 shell 的测试必须带 feature 选择，否则 tests/ipc.rs
+  # 因 #![cfg(feature = "test")] 编译为零个测试并照常退出 0（绿灯却什么都没测）。
+  shell:
+    name: shell
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ./target
+          key: ${{ runner.os }}-cargo-shell-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-shell-
+
+      - name: Test (Tauri shell, feature-gated IPC tests included)
+        run: cargo test -p prismdocs-shell --features test
+
+  frontend:
+    name: frontend
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test with coverage
+        run: npm run test -- --run --coverage
+
+      - run: npm run build
