@@ -33,7 +33,9 @@ apple-native-keyring-store = { version = "1.0", features = ["keychain"] }
 rmcp = { version = "2.2", features = ["server", "transport-streamable-http-server"] }
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
+tokio-util = "0.7"
 reqwest = "0.13"
+tower = "0.5"
 
 # --- content pipeline ---
 comrak = "0.54"

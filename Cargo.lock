@@ -3024,9 +3024,16 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "prism-types",
+ "reqwest",
  "rmcp",
+ "serde",
+ "serde_json",
+ "subtle",
  "thiserror 2.0.19",
  "tokio",
+ "tokio-util",
+ "tower",
+ "tracing",
 ]
 
 [[package]]

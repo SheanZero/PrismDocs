@@ -7,9 +7,24 @@ rust-version.workspace = true
 
 # D-09：只允许依赖 prism-types，**不得**依赖 prism-engine——
 # 编译期无 facade↔mcp 依赖环由 `cargo tree -p prism-mcp` 断言。
+#
+# reqwest 只出现在 [dev-dependencies]：本 crate 托管的是 HTTP **服务端**，
+# 客户端能力仅测试需要。普通边一旦出现 reqwest，check-deps.sh 的
+# single-egress 断言会经 prism-engine 的依赖树把它抓出来。
 [dependencies]
 prism-types = { workspace = true }
 rmcp = { workspace = true }
 axum = { workspace = true }
-tokio = { workspace = true }
+# net：serve_loopback 需要 TcpListener；features 与 workspace 声明取并集。
+tokio = { workspace = true, features = ["net"] }
+tokio-util = { workspace = true }
+subtle = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["net", "time"] }
+reqwest = { workspace = true }
+tower = { workspace = true, features = ["util"] }
