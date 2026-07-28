@@ -1,0 +1,29 @@
+[package]
+name = "prismdocs-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "PrismDocs desktop shell (the only crate that links tauri)"
+
+[lib]
+name = "prismdocs_shell"
+path = "src/lib.rs"
+
+[[bin]]
+name = "prismdocs"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { workspace = true, features = [] }
+
+[dependencies]
+tauri = { workspace = true, features = ["protocol-asset"] }
+prism-engine = { workspace = true }
+prism-types = { workspace = true }
+prism-store = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+
+[features]
+test = ["tauri/test"]

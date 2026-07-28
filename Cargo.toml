@@ -1,0 +1,61 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# --- engine crates (path) ---
+prism-types = { path = "crates/prism-types" }
+prism-store = { path = "crates/prism-store" }
+prism-fs = { path = "crates/prism-fs" }
+prism-parse = { path = "crates/prism-parse" }
+prism-anchor = { path = "crates/prism-anchor" }
+prism-llm = { path = "crates/prism-llm" }
+prism-mcp = { path = "crates/prism-mcp" }
+prism-engine = { path = "crates/prism-engine" }
+
+# --- storage ---
+rusqlite = { version = "0.40", features = ["bundled"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.35"
+rusqlite_migration = "2.6"
+
+# --- secrets (prism-llm / prism-cli only) ---
+keyring-core = "1.0"
+apple-native-keyring-store = { version = "1.0", features = ["keychain"] }
+
+# --- mcp / http ---
+rmcp = { version = "2.2", features = ["server", "transport-streamable-http-server"] }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
+reqwest = "0.13"
+
+# --- content pipeline ---
+comrak = "0.54"
+notify = "8"
+notify-debouncer-full = "0.7"
+blake3 = "1.8"
+similar = "3.1"
+
+# --- shared plumbing ---
+dirs = "6"
+ulid = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+url = "2"
+subtle = "2"
+
+# --- desktop shell (src-tauri only) ---
+tauri = "2"
+tauri-build = "2"
+
+# --- dev ---
+tempfile = "3"
+serial_test = "3"
