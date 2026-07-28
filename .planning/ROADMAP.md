@@ -36,10 +36,18 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. 事件总线骨架各验证一条通路：一条总线事件经粗粒度 Tauri event 往返前端（notify-then-fetch），一条命令经 Channel 有序流式返回（A1）
   3. SQLite schema v1 落地：WAL + 单写者 + r2d2 读池（query_only=ON）并发读写正常；FTS5 中文查询返回非零结果（CJK tokenizer 在 schema v1 定案）；rusqlite_migration 迁移体系可用，bundled SQLite ≥3.51.3
   4. API key 经 keyring-core + apple-native-keyring-store 写入系统钥匙串并可读回，prism-llm 为唯一网络出口与唯一密钥入口，代码与配置中无明文密钥
-**Plans**: TBD
+**Plans**: 9 plans（6 waves）
 
 Plans:
-- [ ] TBD
+- [ ] 01-01-PLAN.md — 工作区骨架与端到端 tracer（React → Tauri → engine → store → SQLite）+ 全 crate 骨架
+- [ ] 01-02-PLAN.md — 四条依赖方向断言、明文密钥静态检查与 macOS CI 门禁
+- [ ] 01-03-PLAN.md — prism-store：迁移体系、schema v1（含 FTS 形态 checkpoint）与 writer-first 连接纪律
+- [ ] 01-04-PLAN.md — prism-types 服务契约（同步 trait + EngineEvent）与 prism-llm 钥匙串密钥入口
+- [ ] 01-05-PLAN.md — prism-store 查询层：FTS 长度分流与语法转义、settings 与 base_url 校验
+- [ ] 01-06-PLAN.md — prism-mcp trait 反转骨架与 Host/Origin/bearer 三层门禁
+- [ ] 01-07-PLAN.md — prism-engine facade：事件总线与服务 trait 实现
+- [ ] 01-08-PLAN.md — Tauri shell IPC 双通路：coarse event（含 Lagged→Resync）与 Channel 有序流
+- [ ] 01-09-PLAN.md — 前端 settings 页与 dev 冒烟页（TanStack Query 失效模式）
 
 ### Phase 2: F1 导入与同步
 **Goal**: 磁盘权威的 Base 层导入与实时同步管线可靠运转——文档身份在重命名/外部重写/git 批量操作下保持稳定，为下游所有消费方提供身份与版本层（调研认定的坑最密集阶段，预算按此配置；A2：锚定纯核 + 标定 harness 可在本阶段并行启动）
@@ -158,7 +166,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 ∥ 5 → 6 → 7 → 8（�
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 基建骨架 | 0/TBD | Not started | - |
+| 1. 基建骨架 | 0/9 | Planned | - |
 | 2. F1 导入与同步 | 0/TBD | Not started | - |
 | 3. 锚定引擎 ★ | 0/TBD | Not started | - |
 | 4. F2′ 速读区 | 0/TBD | Not started | - |
