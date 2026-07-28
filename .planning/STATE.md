@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-07-28T23:28:41.754Z"
+stopped_at: Completed 01-05-PLAN.md
+last_updated: "2026-07-28T23:42:20.668Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 9
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 5 of 9
+Plan: 6 of 9
 Status: Ready to execute
 Last activity: 2026-07-28 — Phase 01 execution started
 
-Progress: [████░░░░░░] 44%
+Progress: [██████░░░░] 56%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [████░░░░░░] 44%
 | Phase 01 P02 | 8min | 2 tasks | 8 files |
 | Phase 01 P03 | 68min | 2 tasks | 8 files |
 | Phase 01 P04 | 7min | 2 tasks | 11 files |
+| Phase 01 P05 | 38min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 跨边界转发第三方错误时只保留已核实安全的 Display 文本：keyring_core::Error 的 derive Debug 会打印原始密钥字节，而 unwrap()/tracing 的 ?err 走的正是 Debug
 - [Phase ?]: 持有密钥的类型手写 Debug 输出占位串，并刻意不实现 Display——缺席让 format!("{key}") 成为编译错误而非运行期泄漏
 - [Phase ?]: 钥匙串 service/account 命名（PrismDocs / llm_api_key / mcp_bearer_token）是跨二进制契约，固化于 docs/keychain-naming.md；prismdocs-helper 因 D-10 必须自带字面量副本
+- [Phase ?]: FTS 表在 SQL 中不能起别名：MATCH 左操作数必须是 fts5 表名，JOIN 打在 d.rowid_pk = documents_fts.rowid 上
+- [Phase ?]: LIKE 回退分支补模式语言层转义（%/_/\ + ESCAPE）：与未转义 MATCH 是同一类漏洞的两个面
+- [Phase ?]: settings 的 base_url 校验与密钥键名守卫都长在 set_setting 内部：放调用方是约定，放写入路径才是机制
 
 ### Pending Todos
 
@@ -101,6 +105,7 @@ None yet.
 - [Phase 4 前]: Q1 速读区模型档位待 M0 评测定档
 - ~~[Phase 1]: rmcp 2.2 feature-flag 确切名称需对照 README 核验（5 分钟检查）~~ — RESOLVED (01-01)：`rmcp = { version = "2.2", features = ["server", "transport-streamable-http-server"] }` 已在 prism-mcp 中实际编译通过
 - [数据勘误]: REQUIREMENTS.md 原 Coverage 写 51 条，实际 v1 REQ-ID 为 61 条，已于 roadmap 创建时更正
+- [每个 plan 执行时]: 反证本身需要被验证（01-03 后第二次出现）：01-05 的计划反证 C 实跑不成立，暴露了 LIKE 分支缺阴性对照；触发器 DELETE 路径的验证按计划写法恒真（JOIN 掩盖了陈旧索引条目）。跑反证时要看**落点**（红在哪一条断言）而非只看红绿。
 
 ## Deferred Items
 
@@ -112,6 +117,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T23:28:33.078Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-07-28T23:42:11.277Z
+Stopped at: Completed 01-05-PLAN.md
 Resume file: None
