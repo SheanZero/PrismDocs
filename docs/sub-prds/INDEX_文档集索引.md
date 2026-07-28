@@ -14,10 +14,11 @@
 | L3 功能 | PRD-F5 理解卡片 | `sub-prds/PRD_F5_Cards.md` | v0.1 |
 | L3 功能 | PRD-F6 Chrome 剪藏插件 | `sub-prds/PRD_F6_Clipper.md` | v0.1 |
 | L3 功能 | PRD-F7 上下文组装 Context Pack | `sub-prds/PRD_F7_Context_Pack.md` | **v0.2** |
+| L3 功能 | PRD-F8 跨项目知识层 ★ 防偏差 | `sub-prds/PRD_F8_Cross_Project.md` | **v0.1** |
 
 **v0.2 变更范围**：合并 CoWiki/OKF 补充调研（BRD B1–B6、主 PRD P1–P8）。新增内容：主 PRD §2.5 OKF 兼容约定（受控 type 词表）、REQ-1.8/1.9（frontmatter 解析、log.md 物化）、REQ-4.7（Agent 贡献溯源）、REQ-7.6（导出 OKF Bundle）。F2/F3/F5/F6 不受本次变更影响，保持 v0.1。
 
-**v0.3 变更范围（2026-07-28，构想 v2）**：①F2 修订为速读区（全文 Lens 降 P1，回归条件见 BRD §6.1）；②新增 F8 跨项目知识层（契约订阅、漂移检测→闭环，主 PRD §3-F8）；③F6 剪藏整体降 P1；④新增 REQ-4.8 变更时间线；⑤MCP 传输定为 D-07（app 内嵌 loopback streamable HTTP，作废子 PRD-F4 REQ-4.NEW-1 的 stdio 方案）。**子 PRD 尚未同步 v0.3**，待更新：F2（拆分速读区）、F4（传输与复核界面）、F5（存卡入口/跨项目双链）、F6（P1 标注）、F7（Workspace 作用域）；待新建：PRD-F8。
+**v0.3 变更范围（2026-07-28，构想 v2）**：①F2 修订为速读区（全文 Lens 降 P1，回归条件见 BRD §6.1）；②新增 F8 跨项目知识层（契约订阅、漂移检测→闭环，主 PRD §3-F8）；③F6 剪藏整体降 P1；④新增 REQ-4.8 变更时间线；⑤MCP 传输定为 D-07（app 内嵌 loopback streamable HTTP，作废子 PRD-F4 REQ-4.NEW-1 的 stdio 方案）。**子 PRD 同步状态**：PRD-F8 已新建（v0.1，2026-07-28）；待更新：F2（拆分速读区）、F4（传输与复核界面）、F5（存卡入口/跨项目双链）、F6（P1 标注）、F7（Workspace 作用域）。
 
 ## 编号约定
 
