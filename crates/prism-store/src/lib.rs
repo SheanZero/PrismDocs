@@ -27,8 +27,8 @@ pub enum StoreError {
     NoDataDir,
 }
 
-/// sidecar 数据根。**必须**来自 `dirs::data_dir()`——用 Tauri 的 `app_data_dir`
-/// 会让本 crate 依赖 tauri，违反 D-01。
+/// sidecar 数据根。**必须**来自 `dirs::data_dir()`——Tauri 的等价 API 会让本 crate
+/// 依赖 tauri，违反 D-01。
 pub fn data_root() -> Result<PathBuf, StoreError> {
     let base = dirs::data_dir().ok_or(StoreError::NoDataDir)?;
     Ok(base.join(DATA_DIR_NAME))
@@ -43,13 +43,27 @@ pub struct Store {
 }
 
 impl Store {
+    /// 打开（必要时创建）单写者连接。
+    ///
+    /// tracer 阶段刻意不设 WAL / pragma / 迁移 / 只读池——那是 plan 03 的
+    /// writer-first 六步序，顺序有语义，不能在这里提前猜。
     pub fn open(db_path: &Path) -> Result<Store, StoreError> {
-        let _ = db_path;
-        todo!("tracer: create parent dir then open the writer connection")
+        if let Some(dir) = db_path.parent() {
+            std::fs::create_dir_all(dir).map_err(|source| StoreError::Io {
+                path: dir.to_path_buf(),
+                source,
+            })?;
+        }
+        let writer = Connection::open(db_path)?;
+        Ok(Store {
+            writer: Mutex::new(writer),
+        })
     }
 
     pub fn sqlite_version(&self) -> Result<String, StoreError> {
-        todo!("tracer: SELECT sqlite_version()")
+        let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
+        let version = conn.query_row("SELECT sqlite_version()", [], |row| row.get(0))?;
+        Ok(version)
     }
 }
 

@@ -19,13 +19,12 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(store: Arc<Store>) -> Engine {
-        let _ = store;
-        todo!("tracer: hold the store handle")
+        Engine { store }
     }
 
     /// 端到端探针：把 store 报告的 SQLite 版本原样送回调用方。
     pub fn ping(&self) -> Result<String, EngineError> {
-        todo!("tracer: delegate to Store::sqlite_version")
+        Ok(self.store.sqlite_version()?)
     }
 
     pub fn types_crate_version(&self) -> &'static str {
