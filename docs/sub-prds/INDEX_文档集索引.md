@@ -15,6 +15,7 @@
 | L3 功能 | PRD-F6 Chrome 剪藏插件（P1，MVP 不交付） | `sub-prds/PRD_F6_Clipper.md` | **v0.2** |
 | L3 功能 | PRD-F7 上下文组装 Context Pack | `sub-prds/PRD_F7_Context_Pack.md` | **v0.3** |
 | L3 功能 | PRD-F8 跨项目知识层 ★ 防偏差 | `sub-prds/PRD_F8_Cross_Project.md` | **v0.1** |
+| L4 技术设计 | TD-01 Block 锚定与迁移契约 ★ 接口冻结点（四消费方） | `技术设计_Block锚定与迁移契约.md` | **v0.1**（阈值待 M0 标定） |
 
 **v0.2 变更范围**：合并 CoWiki/OKF 补充调研（BRD B1–B6、主 PRD P1–P8）。新增内容：主 PRD §2.5 OKF 兼容约定（受控 type 词表）、REQ-1.8/1.9（frontmatter 解析、log.md 物化）、REQ-4.7（Agent 贡献溯源）、REQ-7.6（导出 OKF Bundle）。F2/F3/F5/F6 不受本次变更影响，保持 v0.1。
 
