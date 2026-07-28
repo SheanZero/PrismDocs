@@ -43,8 +43,6 @@ impl McpDeps {
     ///
     /// 刻意不是 `pub` 字段也刻意不叫 `bearer()`：调用点在代码搜索中可见，
     /// 且中间件之外没有第二个消费者。返回 `&str` 而非 `String` 是为了不制造副本。
-    // 唯一的非测试消费者是 Task 2 的 `require_bearer`；该 allow 随之删除。
-    #[allow(dead_code)]
     pub(crate) fn expose_bearer(&self) -> &str {
         &self.bearer
     }

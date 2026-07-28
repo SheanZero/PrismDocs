@@ -10,6 +10,7 @@
 
 pub mod deps;
 pub mod handler;
+pub mod middleware;
 pub mod server;
 
 /// 后续 plan 会在此扩展（绑定失败、token 缺失等）。
