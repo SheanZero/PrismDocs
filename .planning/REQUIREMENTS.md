@@ -87,7 +87,7 @@
 ### 平台与基建 INFRA
 
 - [ ] **INFRA-01**: Rust engine workspace（不依赖 tauri、可独立测试）+ Tauri 薄 shell + 事件总线骨架（notify-then-fetch 粗粒度事件 + Channel 有序流各验证一条通路）；prism-mcp 经 service trait 反转解依赖环（D-01，调研 A1/ARCHITECTURE）
-- [ ] **INFRA-02**: SQLite WAL 单写者+r2d2 读池（query_only）架构；FTS5 含 CJK 可用 tokenizer（schema v1 时定）；rusqlite_migration 迁移体系；bundled SQLite ≥3.51.3（调研 Phase 1 不可逆决策）
+- [x] **INFRA-02**: SQLite WAL 单写者+r2d2 读池（query_only）架构；FTS5 含 CJK 可用 tokenizer（schema v1 时定）；rusqlite_migration 迁移体系；bundled SQLite ≥3.51.3（调研 Phase 1 不可逆决策）
 - [ ] **INFRA-03**: API key 存系统钥匙串（keyring-core + apple-native-keyring-store）；支持 Anthropic/OpenAI 兼容端点与自定义 base_url；prism-llm 为唯一网络出口与唯一密钥入口（§5，调研 STACK）
 - [ ] **INFRA-04**: 性能达标：500 文档/2000 卡片下全文搜索 <300ms、文档打开 <500ms、FS 变更呈现 <10s、单文档锚点迁移 P95 <300ms（§5，TD-01 §10）
 - [ ] **INFRA-05**: 本地优先：断网可读可评可写卡（LLM 功能除外）；数据库单目录可备份；kill -9 不丢数据（§5）
@@ -144,7 +144,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
+| INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 1 | Pending |
 | IMPORT-01 | Phase 2 | Pending |
 | IMPORT-02 | Phase 2 | Pending |
@@ -208,6 +208,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 注：INFRA-04/05 为跨切预算，自 Phase 1 起作为设计约束执行，映射至完成验证的 Phase 8（GSD 规则：每条需求映射且仅映射一个 Phase）。
 
 **Coverage:**
+
 - v1 requirements: 61 total（勘误：初稿 Coverage 误记为 51，实际 REQ-ID 计数为 61，2026-07-28 roadmap 创建时更正）
 - Mapped to phases: 61
 - Unmapped: 0 ✓

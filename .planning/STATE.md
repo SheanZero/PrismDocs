@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-07-28T14:35:13.420Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-07-28T23:13:39.476Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 9
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 3 of 9
+Plan: 4 of 9
 Status: Ready to execute
 Last activity: 2026-07-28 — Phase 01 execution started
 
-Progress: [██░░░░░░░░] 22%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [██░░░░░░░░] 22%
 |------|----------|-------|-------|
 | Phase 01 P01 | 39min | 3 tasks | 53 files |
 | Phase 01 P02 | 8min | 2 tasks | 8 files |
+| Phase 01 P03 | 68min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Recent decisions affecting current work:
 - [Phase 1]: INFRA-01 不在 plan 01-01 勾选：该需求横跨本 phase 的 7 个 plan，事件总线与 Channel 有序流在 01-04/01-08/01-09
 - [Phase ?]: 依赖方向断言用 herestring 而非管道喂 grep：pipefail + grep -q 早退会因 SIGPIPE 让四条断言全部静默恒绿
 - [Phase ?]: 覆盖率 Phase 1 只测量不设阈值（engine 85.48% / 前端 10%），Phase 2 按排除已登记人工与 ignored 路径后 >=80% 开硬闸门
+- [Phase ?]: schema v1 定案方案 A：external-content FTS5 + rowid_pk 显式 INTEGER PRIMARY KEY + 三同步触发器 + STRICT 表，索引粒度保持默认全粒度（不声明该选项，降粒度会废掉 4 字中文 MATCH）
+- [Phase ?]: 只读池用 SQLITE_OPEN_READ_WRITE + query_only=ON 而非 READ_ONLY flags：只读连接在崩溃后 -shm 缺失时无法重建它
+- [Phase ?]: 「颠倒迁移与建池顺序」的行为反证实测不成立（六个并发测试仍全绿），改用 open.rs 内的源码顺序断言作为常驻哨兵
 
 ### Pending Todos
 
@@ -102,6 +106,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T14:35:13.415Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-07-28T23:13:31.593Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
