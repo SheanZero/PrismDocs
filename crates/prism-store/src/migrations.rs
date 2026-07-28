@@ -13,6 +13,7 @@ use rusqlite_migration::{Migrations, M};
 
 static MIGRATIONS: LazyLock<Migrations<'static>> = LazyLock::new(|| {
     Migrations::new(vec![
+        M::up(include_str!("../migrations/001_schema_v1.sql")),
         // Phase 2/3/5/7 各自 append 自己的 M::up，绝不修改上面这条。
     ])
 });
