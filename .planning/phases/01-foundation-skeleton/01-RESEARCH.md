@@ -1103,12 +1103,13 @@ test-engine:
 | `@tauri-apps/cli` | `tauri dev` / `tauri build` | ✗（未安装） | — | `npm install -D @tauri-apps/cli@2`（Wave 0 任务） |
 | `just` | justfile 断言脚本 | ✗ | — | 断言改写为 `scripts/check-deps.sh` + npm script；**不阻塞** |
 | `cargo-nextest` | 测试进程隔离（Pitfall 1 方案 a） | ✗ | — | `serial_test` crate（方案 b），零工具链要求 |
+| `cargo-llvm-cov` | engine 侧覆盖率测量（`just coverage` / CI engine job） | ✗ | — | 本机 `cargo install cargo-llvm-cov`；CI 用 `taiki-e/install-action@cargo-llvm-cov`。Phase 1 只测量呈报不设阈值，故**不阻塞** |
 | `cargo-deny` | 可选的依赖策略强制 | ✗ | — | `cargo tree` 断言已覆盖本阶段全部需求；**不需要** |
 | Apple Developer 签名身份 | 公证 DMG | 未检测（Phase 8 才需要） | — | Phase 1 用 ad-hoc 签名；PITFALLS 提示 dev 期签名身份变化会反复触发 Keychain 弹窗，建议固定 ad-hoc 身份 |
 
 **Missing dependencies with no fallback:** 无。
 
-**Missing dependencies with fallback:** `@tauri-apps/cli`（npm 安装，属正常项目初始化）；`just`（可用 shell 脚本替代）；`cargo-nextest`（可用 serial_test 替代）。三者均不阻塞执行。
+**Missing dependencies with fallback:** `@tauri-apps/cli`（npm 安装，属正常项目初始化）；`just`（可用 shell 脚本替代）；`cargo-nextest`（可用 serial_test 替代）；`cargo-llvm-cov`（`cargo install` 一次，CI 侧由 `taiki-e/install-action` 装）。四者均不阻塞执行。
 
 ## Validation Architecture
 
