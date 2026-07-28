@@ -5,11 +5,16 @@
 //! 因此编译期不存在 facade↔mcp 依赖环——该性质由
 //! `cargo tree -p prism-mcp --edges normal` 中不出现 prism-engine 断言。
 //!
-//! Phase 1 plan 01（D-08）只建立骨架；bearer 中间件、Origin allowlist 与
-//! 工具注册是 plan 01-06 及 Phase 6 的内容。
+//! Phase 1 plan 01（D-08）建立骨架，plan 01-06 填入注入容器、最小 handler、
+//! loopback 宿主与三层鉴权中间件；工具面本身是 Phase 6 的内容。
+
+pub mod deps;
+pub mod handler;
+pub mod server;
 
 /// 后续 plan 会在此扩展（绑定失败、token 缺失等）。
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum McpError {
     #[error("failed to bind the loopback MCP listener: {0}")]
     Bind(#[from] std::io::Error),
