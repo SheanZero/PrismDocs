@@ -1,4 +1,107 @@
 //! 非密钥配置的 k/v 读写（D-05）。
+//!
+//! # 什么进得来，什么进不来
+//!
+//! 进得来：`base_url`、模型标识、项目阈值这类**非密钥**配置。存 SQLite 的三条理由是
+//! 随库整体备份、单一真相源、与其余写入事务一致。
+//!
+//! 进不来：任何密钥。API key 与 MCP bearer token 走系统钥匙串（`prism-llm::secrets`），
+//! **绝不入库**——这张表会随 sidecar 目录被整体备份带走，一次备份就把密钥送出了本机。
+//! 这条边界由 [`is_secret_like_key`] 在写入路径上强制，不是靠注释约定：注释拦不住
+//! 三个月后那个「先塞进去回头再改」的调用点。
+
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use rusqlite::{Connection, Transaction};
+use url::Url;
+
+use crate::error::StoreError;
+
+/// LLM 端点。写入前必过 [`validate_base_url`]。
+pub const SETTING_BASE_URL: &str = "llm.base_url";
+/// 模型标识。
+pub const SETTING_MODEL: &str = "llm.model";
+
+/// `base_url` 允许的 scheme。`file:` / `javascript:` 之类既是 SSRF 雏形也是本地文件读取面。
+pub const ALLOWED_URL_SCHEMES: [&str; 2] = ["http", "https"];
+
+/// 键名里出现即判定为疑似密钥的子串（大小写不敏感）。
+const SECRET_KEY_MARKERS: [&str; 3] = ["key", "token", "secret"];
+
+const SQL_GET: &str = "SELECT value FROM settings WHERE key = ?1";
+const SQL_UPSERT: &str = "INSERT INTO settings(key, value, updated_at) VALUES(?1, ?2, ?3) \
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at";
+
+/// 键名是否疑似密钥。
+///
+/// 宽进严出：宁可误拒一个叫 `ui.hotkey` 的正常配置（改名即可），
+/// 也不放过一个叫 `llm.api_key` 的真密钥（一旦进库，备份就带得走）。
+pub fn is_secret_like_key(key: &str) -> bool {
+    let lowered = key.to_lowercase();
+    SECRET_KEY_MARKERS.iter().any(|m| lowered.contains(m))
+}
+
+/// 解析并校验 LLM 端点。
+///
+/// 错误里只有键名与规则，**没有传入的 value**——被误填进这里的很可能正是一个 API key，
+/// 而错误消息会一路冒泡到日志与前端（T-01-26）。
+pub fn validate_base_url(raw: &str) -> Result<Url, StoreError> {
+    let url = Url::parse(raw.trim())
+        .map_err(|e| StoreError::InvalidUrl(format!("could not be parsed as a URL: {e}")))?;
+
+    if !ALLOWED_URL_SCHEMES.contains(&url.scheme()) {
+        return Err(StoreError::InvalidUrl(format!(
+            "scheme must be one of {ALLOWED_URL_SCHEMES:?}"
+        )));
+    }
+    if url.host_str().is_none_or(str::is_empty) {
+        return Err(StoreError::InvalidUrl("host must not be empty".into()));
+    }
+
+    // 自建内网端点是合法场景，所以只警告不阻断；真正发出请求时在 Phase 4 复核。
+    let is_loopback = matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
+    if url.scheme() == "http" && !is_loopback {
+        tracing::warn!(
+            host = url.host_str().unwrap_or_default(),
+            "LLM endpoint uses plaintext http to a non-loopback host"
+        );
+    }
+
+    Ok(url)
+}
+
+/// 读一条配置。查不到是 `Ok(None)`，不是错误。
+pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>, StoreError> {
+    Ok(conn
+        .query_row(SQL_GET, [key], |r| r.get::<_, String>(0))
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(other),
+        })?)
+}
+
+/// 写一条配置（同 key 覆盖）。
+///
+/// 两道守卫都长在这里而不是调用方：疑似密钥的键名一律拒绝，`base_url` 一律先过 scheme 校验。
+/// 放在调用方就等于「每个调用点都记得」，那是约定；放在这里它才是机制。
+pub fn set_setting(tx: &Transaction, key: &str, value: &str) -> Result<(), StoreError> {
+    if is_secret_like_key(key) {
+        return Err(StoreError::InvalidSetting(format!(
+            "key {key:?} looks like a secret; store it in the system keychain instead"
+        )));
+    }
+    if key == SETTING_BASE_URL {
+        validate_base_url(value)?;
+    }
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    tx.execute(SQL_UPSERT, (key, value, now))?;
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

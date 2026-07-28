@@ -29,6 +29,15 @@ pub enum StoreError {
     #[error("bundled sqlite is too old: {0}")]
     SqliteTooOld(String),
 
+    /// 写入 `settings` 的键名不被接受（当前唯一的拒绝理由是「疑似密钥」）。
+    /// 消息只带键名与规则，**不带 value**——被误填进来的很可能就是密钥本身（T-01-26）。
+    #[error("invalid setting: {0}")]
+    InvalidSetting(String),
+
+    /// `base_url` 不是一个可接受的 URL。同样只描述规则，不回显传入的值。
+    #[error("invalid url: {0}")]
+    InvalidUrl(String),
+
     #[error("could not resolve the platform data directory")]
     NoDataDir,
 }

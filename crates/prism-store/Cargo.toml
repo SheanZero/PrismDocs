@@ -16,6 +16,7 @@ ulid = { workspace = true }
 blake3 = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
