@@ -143,13 +143,75 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (由 roadmap 创建时填充) | | |
+| INFRA-01 | Phase 1 | Pending |
+| INFRA-02 | Phase 1 | Pending |
+| INFRA-03 | Phase 1 | Pending |
+| IMPORT-01 | Phase 2 | Pending |
+| IMPORT-02 | Phase 2 | Pending |
+| IMPORT-03 | Phase 2 | Pending |
+| IMPORT-04 | Phase 2 | Pending |
+| IMPORT-05 | Phase 2 | Pending |
+| IMPORT-06 | Phase 2 | Pending |
+| IMPORT-07 | Phase 2 | Pending |
+| IMPORT-08 | Phase 2 | Pending |
+| IMPORT-09 | Phase 2 | Pending |
+| ANCHOR-01 | Phase 3 | Pending |
+| ANCHOR-02 | Phase 3 | Pending |
+| ANCHOR-03 | Phase 3 | Pending |
+| ANCHOR-04 | Phase 3 | Pending |
+| ANCHOR-05 | Phase 3 | Pending |
+| DIGEST-01 | Phase 4 | Pending |
+| DIGEST-02 | Phase 4 | Pending |
+| DIGEST-03 | Phase 4 | Pending |
+| DIGEST-04 | Phase 4 | Pending |
+| DIGEST-05 | Phase 4 | Pending |
+| DIGEST-06 | Phase 4 | Pending |
+| DIGEST-07 | Phase 4 | Pending |
+| DIGEST-08 | Phase 4 | Pending |
+| COMMENT-01 | Phase 5 | Pending |
+| COMMENT-02 | Phase 5 | Pending |
+| COMMENT-03 | Phase 5 | Pending |
+| COMMENT-04 | Phase 5 | Pending |
+| COMMENT-05 | Phase 5 | Pending |
+| COMMENT-06 | Phase 5 | Pending |
+| LOOP-01 | Phase 6 | Pending |
+| LOOP-02 | Phase 6 | Pending |
+| LOOP-03 | Phase 6 | Pending |
+| LOOP-04 | Phase 6 | Pending |
+| LOOP-05 | Phase 6 | Pending |
+| LOOP-06 | Phase 6 | Pending |
+| LOOP-07 | Phase 6 | Pending |
+| LOOP-08 | Phase 6 | Pending |
+| LOOP-09 | Phase 6 | Pending |
+| CARD-01 | Phase 7 | Pending |
+| CARD-02 | Phase 7 | Pending |
+| CARD-03 | Phase 7 | Pending |
+| CARD-04 | Phase 7 | Pending |
+| CARD-05 | Phase 7 | Pending |
+| CARD-06 | Phase 7 | Pending |
+| PACK-01 | Phase 7 | Pending |
+| PACK-02 | Phase 7 | Pending |
+| PACK-03 | Phase 7 | Pending |
+| PACK-04 | Phase 7 | Pending |
+| PACK-05 | Phase 7 | Pending |
+| XPROJ-01 | Phase 7 | Pending |
+| XPROJ-02 | Phase 7 | Pending |
+| XPROJ-03 | Phase 7 | Pending |
+| XPROJ-04 | Phase 7 | Pending |
+| XPROJ-05 | Phase 7 | Pending |
+| INFRA-06 | Phase 7 | Pending |
+| INFRA-04 | Phase 8 | Pending |
+| INFRA-05 | Phase 8 | Pending |
+| INFRA-07 | Phase 8 | Pending |
+| INFRA-08 | Phase 8 | Pending |
+
+注：INFRA-04/05 为跨切预算，自 Phase 1 起作为设计约束执行，映射至完成验证的 Phase 8（GSD 规则：每条需求映射且仅映射一个 Phase）。
 
 **Coverage:**
-- v1 requirements: 51 total
-- Mapped to phases: 0
-- Unmapped: 51 ⚠️ (roadmap pending)
+- v1 requirements: 61 total（勘误：初稿 Coverage 误记为 51，实际 REQ-ID 计数为 61，2026-07-28 roadmap 创建时更正）
+- Mapped to phases: 61
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-28*
-*Last updated: 2026-07-28 after initial definition*
+*Last updated: 2026-07-28 after roadmap creation (traceability filled, coverage corrected 51→61)*
