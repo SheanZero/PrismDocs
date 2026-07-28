@@ -3043,6 +3043,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "dirs",
+ "prism-types",
  "r2d2",
  "r2d2_sqlite",
  "rusqlite",
@@ -3050,6 +3051,7 @@ dependencies = [
  "serde",
  "tempfile",
  "thiserror 2.0.19",
+ "tracing",
  "ulid",
  "url",
 ]
