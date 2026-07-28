@@ -13,6 +13,10 @@ created: 2026-07-28
 
 > Per-phase validation contract for feedback sampling during execution.
 > Seeded from `01-RESEARCH.md` § Validation Architecture. Per-task rows are filled by `/gsd-validate-phase` once PLAN.md task IDs exist.
+>
+> **This file is the authority on command form; it supersedes the RESEARCH seed.** RESEARCH § Validation
+> Architecture predates the plans and still shows `just …` (not installed here) and a bare `npm run test`
+> (hangs in watch mode). Run what is written below, not what is written there.
 
 ---
 
@@ -23,9 +27,9 @@ created: 2026-07-28
 | **Framework** | `cargo test` built-in harness (+ optional `cargo-nextest` for process isolation) + `tempfile` 3 + `serial_test` 3; Vitest for the frontend smoke surface |
 | **Config file** | none — Wave 0 creates all of it (no `Cargo.toml`, no `vite.config.ts`, no `package.json`; repo currently holds only `docs/` + `.planning/`) |
 | **Quick run command** | `cargo test -p prism-types -p prism-store -p prism-llm -p prism-mcp -p prism-engine` |
-| **Full suite command** | `just check-dup && just check-tauri-free && just check-no-cycle && just check-single-egress && cargo test --workspace && npm run test` |
+| **Full suite command** | `bash scripts/check-deps.sh all && bash scripts/check-secrets.sh && cargo test --workspace && cargo test -p prismdocs-shell --features test && npm run test -- --run` |
 | **Estimated runtime** | ~60 seconds (greenfield; re-measure after Wave 0) |
-| **Coverage** | Measured, not gated, in Phase 1 — `just coverage` (`cargo llvm-cov` + `vitest --coverage`). Rationale and the Phase-2 hard-gate handoff are recorded in `01-02-PLAN.md` Task 2. |
+| **Coverage** | Measured, not gated, in Phase 1 — `bash -c 'cargo llvm-cov --workspace --summary-only && npm run test -- --run --coverage'` (`just coverage` is the same two commands). **Precondition:** `cargo install cargo-llvm-cov` locally (CI installs it via `taiki-e/install-action`) and `npm ci` for `@vitest/coverage-v8`. Rationale and the Phase-2 hard-gate handoff are recorded in `01-02-PLAN.md` Task 2. |
 
 > **Filter form (hard rule — a green that proves nothing is worse than a red).**
 > `cargo test -p <crate> <FILTER>` filters by **test name**, not by file name. A filter that names an
@@ -34,13 +38,38 @@ created: 2026-07-28
 > path for in-module unit tests). Every bare filter in the tables below is a function or module name
 > that exists in the plan which defines it.
 
+> **Command preconditions (hard rule — same family as the filter rule: a documented command must do
+> what it appears to do, on a laptop as well as in CI).** Every command in this file either has zero
+> preconditions or states them inline. The four that exist in Phase 1:
+>
+> 1. **Non-default cargo feature.** `src-tauri/tests/ipc.rs` uses `tauri::test`, which exists only
+>    under the non-default `test` feature (`[features] test = ["tauri/test"]`). cargo compiles *every*
+>    file under `tests/` regardless of the filter, so that file carries `#![cfg(feature = "test")]`
+>    as its first line (plan `01-08` Task 2) — without the feature it compiles to **zero tests**
+>    instead of failing to build. Consequence: `cargo test --workspace` and `cargo llvm-cov --workspace`
+>    stay green but **do not cover the two ipc tests**. Anywhere the workspace command appears below,
+>    `cargo test -p prismdocs-shell --features test` appears beside it. That second command is the
+>    only thing that runs them.
+> 2. **`just` is not installed on this machine** (`01-RESEARCH.md` § Environment Availability). Every
+>    command here is therefore written in its `bash scripts/…` form, which has no precondition and is
+>    exactly what CI runs. `just <recipe>` is a shorthand with identical behavior when `just` *is*
+>    installed — plan `01-02` builds both from one implementation.
+> 3. **`cargo-llvm-cov` is a separate install**, not part of rustup. See the Coverage row.
+> 4. **vitest defaults to watch mode.** `npm run test` never exits under a TTY; every invocation here
+>    is `npm run test -- --run`. Also requires `npm ci` to have been run.
+>
+> The `#[ignore]`d real-keychain path has its own precondition, stated in § Manual-Only Verifications.
+
 ---
 
 ## Sampling Rate
 
 - **After every task commit:** Run `cargo test -p <changed crate>` + `cargo clippy -p <changed crate> -- -D warnings`
-- **After every plan wave:** Run `just check-dup && just check-tauri-free && just check-no-cycle && just check-single-egress && cargo test --workspace`
-- **Before `/gsd-verify-work`:** Full suite green + the four manual smoke-page checks below + `just coverage` run once and its two numbers recorded in the phase SUMMARY
+  (for `prismdocs-shell` add `cargo test -p prismdocs-shell --features test` — precondition 1 above)
+- **After every plan wave:** Run `bash scripts/check-deps.sh all && cargo test --workspace && cargo test -p prismdocs-shell --features test`
+  (the second cargo command is not redundant: the first one compiles `tests/ipc.rs` to zero tests — precondition 1)
+- **Before `/gsd-verify-work`:** Full suite green + the four manual smoke-page checks below + the coverage
+  command run once (see the Coverage row for its install precondition) and its two numbers recorded in the phase SUMMARY
 - **Max feedback latency:** 60 seconds
 
 ---
@@ -57,14 +86,15 @@ created: 2026-07-28
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists |
 |--------|----------|-----------|-------------------|-------------|
-| INFRA-01 | engine workspace testable without tauri (D-01) | dependency assertion | `just check-tauri-free` | ❌ W0 |
+| INFRA-01 | engine workspace testable without tauri (D-01) | dependency assertion | `bash scripts/check-deps.sh tauri-free` (= `just check-tauri-free`) | ❌ W0 |
 | INFRA-01 | engine-only test suite green | integration | `cargo test -p prism-types -p prism-store -p prism-llm -p prism-mcp -p prism-engine` | ❌ W0 |
-| INFRA-01 | no duplicate rusqlite/reqwest/libsqlite3-sys | dependency assertion | `just check-dup` | ❌ W0 |
-| INFRA-01 | prism-mcp has no facade dependency (D-09) | dependency assertion | `just check-no-cycle` | ❌ W0 |
+| INFRA-01 | no duplicate rusqlite/reqwest/libsqlite3-sys | dependency assertion | `bash scripts/check-deps.sh dup` (= `just check-dup`) | ❌ W0 |
+| INFRA-01 | prism-mcp has no facade dependency (D-09) | dependency assertion | `bash scripts/check-deps.sh no-cycle` (= `just check-no-cycle`) | ❌ W0 |
 | INFRA-01 | prism-mcp returns data through the injected trait | integration | `cargo test -p prism-mcp --test trait_injection` | ❌ W0 |
-| INFRA-01 | bus event → coarse payload mapping (all three arms) | unit | `cargo test -p prismdocs-shell bus_adapter` (module-path filter; matches `bus_adapter::tests::*` and `bus_adapter_maps_event_to_emit` in either layout) | ❌ W0 |
-| INFRA-01 | Lagged→Resync specifically (the silent-failure arm) | unit | `cargo test -p prismdocs-shell lagged_maps_to_resync` | ❌ W0 |
-| INFRA-01 | Channel command invocable and returns Ok | integration (`tauri::test`) | `cargo test -p prismdocs-shell --features test --test ipc` | ❌ W0 |
+| INFRA-01 | bus event → coarse payload mapping (all three arms) | unit | `cargo test -p prismdocs-shell bus_adapter` (module-path filter; matches `bus_adapter::tests::*` and `bus_adapter_maps_event_to_emit` in either layout. No `--features test` needed — `tests/ipc.rs` is cfg-gated, precondition 1) | ❌ W0 |
+| INFRA-01 | Lagged→Resync specifically (the silent-failure arm) | unit | `cargo test -p prismdocs-shell lagged_maps_to_resync` (bare filter valid; see precondition 1) | ❌ W0 |
+| INFRA-01 | Channel command invocable and returns Ok | integration (`tauri::test`) | `cargo test -p prismdocs-shell --features test --test ipc` — **both flags required**: without `--features test` the cfg-gated file compiles to an empty target and `--test ipc` exits 0 having run nothing (precondition 1) | ❌ W0 |
+| INFRA-01 | `tests/ipc.rs` cfg gate holds (workspace command still builds) | build assertion | `cargo test -p prismdocs-shell` (no feature) exits 0 with the ipc target reporting `0 passed` | ❌ W0 |
 | INFRA-02 | project-scoped search isolation | integration | `cargo test -p prism-store --test fts_cjk search_is_scoped_to_project` | ❌ W0 |
 | INFRA-02 | migration set valid | unit | `cargo test -p prism-store migrations_are_valid` | ❌ W0 |
 | INFRA-02 | concurrent read/write under WAL, no BUSY | integration | `cargo test -p prism-store --test concurrency reader_snapshot_is_isolated` | ❌ W0 |
@@ -76,7 +106,7 @@ created: 2026-07-28
 | INFRA-02 | `wal_checkpoint(TRUNCATE)` on close | integration | `cargo test -p prism-store --test concurrency wal_truncated_on_close` | ❌ W0 |
 | INFRA-03 | secret round-trip (mock store) | unit | `cargo test -p prism-llm roundtrip_with_mock_store` | ❌ W0 |
 | INFRA-03 | app starts with no key (`NoEntry` → `Ok(None)`) | unit | `cargo test -p prism-llm no_key_is_not_an_error` | ❌ W0 |
-| INFRA-03 | only prism-llm holds network/secret deps | dependency assertion | `just check-single-egress` | ❌ W0 |
+| INFRA-03 | only prism-llm holds network/secret deps | dependency assertion | `bash scripts/check-deps.sh single-egress` (= `just check-single-egress`) | ❌ W0 |
 | INFRA-03 | no plaintext secrets in code/config | static check | `git grep -nE '(sk-[A-Za-z0-9]{16,}\|api[_-]?key\s*=\s*["\x27][^"\x27]{8,})' -- ':!*.planning/*'` returns nothing | ❌ W0 |
 | INFRA-03 | base_url validation (http/https only) | unit | `cargo test -p prism-store settings_base_url_validation` | ❌ W0 |
 
@@ -95,11 +125,12 @@ Greenfield project — test infrastructure is 100% absent. Wave 0 must establish
 - [ ] `migrations_are_valid` unit test inside `crates/prism-store/src/migrations.rs`
 - [ ] mock/real keyring tests in `crates/prism-llm/src/secrets.rs` (real path `#[ignore]`)
 - [ ] `crates/prism-mcp/tests/trait_injection.rs` — fake `FeedbackSource` impl
-- [ ] `src-tauri/tests/ipc.rs` — `tauri::test::mock_builder` command registration test
+- [ ] `src-tauri/tests/ipc.rs` — `tauri::test::mock_builder` command registration test, **first line `#![cfg(feature = "test")]`** (precondition 1: cargo builds every file under `tests/`, so an ungated file breaks `cargo test --workspace`)
 - [ ] Pure-function mapping unit tests for `src-tauri/src/bus_adapter.rs` (incl. Lagged→Resync)
 - [ ] Isolation convention: every store test injects a `tempfile::TempDir` data root — must never touch the real `~/Library/Application Support/PrismDocs/`
 - [ ] Framework install: Rust harness is built in; `npm install -D vitest`; optionally `cargo install cargo-nextest`
-- [ ] Coverage tooling: `cargo llvm-cov` (CI installs it) + `@vitest/coverage-v8` — measured and reported, not gated, in Phase 1 (see `01-02-PLAN.md` Task 2)
+- [ ] Coverage tooling: `cargo llvm-cov` (**local: `cargo install cargo-llvm-cov`**; CI: `taiki-e/install-action`) + `@vitest/coverage-v8` — measured and reported, not gated, in Phase 1 (see `01-02-PLAN.md` Task 2)
+- [ ] `just` is optional throughout: every command in this file is written in its `bash scripts/…` form so a machine without `just` can run all of it (precondition 2)
 - [ ] CI workflow (GitHub Actions, macOS runner) wiring the per-wave commands
 
 ---
@@ -109,7 +140,7 @@ Greenfield project — test infrastructure is 100% absent. Wave 0 must establish
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
 | Event round-trip + Channel ordering through a real WebView | INFRA-01 | `tauri::test` mock runtime has no real WebView, so the emit→frontend→render path cannot be asserted in-process | Smoke page: click → event count matches 1:1; streaming `seq` strictly increasing with no gaps (total=1000) |
-| Secret round-trip against the real macOS Keychain | INFRA-03 | CI/headless has no unlocked keychain; `keyring_core::set_default_store` is process-global | `cargo test -p prism-llm -- --ignored roundtrip_with_real_keychain`, or perform it through the settings page |
+| Secret round-trip against the real macOS Keychain | INFRA-03 | CI/headless has no unlocked keychain; `keyring_core::set_default_store` is process-global | `cargo test -p prism-llm -- --ignored roundtrip_with_real_keychain` (the test is `#[ignore]`d, so `--ignored` is required — without it the command runs zero tests and exits 0; expect a Keychain authorization prompt), or perform it through the settings page |
 
 ---
 
