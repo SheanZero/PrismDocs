@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Document content is only ever sent to the user-configured LLM endpoint, and no telemetry is enabled by default. [NFR-03]
   4. The loopback MCP endpoint binds 127.0.0.1 only, rejects any request lacking the per-install token or bearing a foreign `Origin`, scopes to the current Workspace, and exposes no write surface beyond comment回执. [AGENT-03]
   5. The Tauri-vs-Node-sidecar ADR is resolved and recorded, and the shell-agnostic `core` skeleton, SQLite schema + migrations, and typed IPC contract are in place.
-**Plans:** 7 plans in 5 waves
+**Plans:** 7 plans in 6 waves
 
 Plans:
 - [ ] 01-01-PLAN.md — Preflight: toolchain gate, Cargo workspace + Tauri/React scaffold, stack-doc version corrections
