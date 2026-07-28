@@ -3,9 +3,9 @@
 | 项目 | 内容 |
 |---|---|
 | 文档类型 | 子 PRD（Feature PRD）— F7 上下文组装 |
-| 版本 | v0.2（同步主 PRD v0.2：新增导出 OKF Bundle） |
-| 日期 | 2026-07-26 |
-| 上游文档 | 主 PRD《PrismDocs MVP 主产品需求文档》v0.2 §3-F7（另参照 §2.5 OKF 兼容约定、§4 Agent 集成协议、§3-F5、§3-F6）；BRD v0.1 痛点 #2/#3/#9 |
+| 版本 | v0.3（同步主 PRD v0.3：组装器升级 Workspace 作用域、Clip 勾选随 F6 降 P1、新增 F8 联动） |
+| 日期 | 2026-07-28 |
+| 上游文档 | 主 PRD《PrismDocs MVP 主产品需求文档》v0.3 §3-F7（另参照 §2.5 OKF 兼容约定、§3-F8、§4 Agent 集成协议、§3-F5、§3-F6）；BRD v0.3 痛点 #2/#3/#9 |
 | 作者 | Shean（起草协作：Claude） |
 
 ---
@@ -26,9 +26,11 @@ Context Pack 是 PrismDocs 的"按需组装外部记忆"：用户勾选 Document
 
 ## 2. 范围
 
-**In Scope（P0）**：组装器面板（树形勾选 + 实时 token 条）；Pack 生成写入 `.prismdocs/context/`；context-worthy 卡片默认预勾选；token 预算设置与超支高亮；模板保存/复用/失效提示；MCP `get_context_pack`；中文卡片正文的"机器英译 / 原文保留"选项。
+**In Scope（P0）**：组装器面板（树形勾选 + 实时 token 条）；**Workspace 作用域勾选**（含其他项目文档，v0.3 新增）；Pack 生成写入 `.prismdocs/context/`；context-worthy 卡片默认预勾选；token 预算设置与超支高亮；模板保存/复用/失效提示；MCP `get_context_pack`；中文卡片正文的"机器英译 / 原文保留"选项。
 
-**P0.5（尽力，可降级）**：Clip 的"AI 压缩版"（生成英文要点摘要以省 token，对应主 PRD REQ-7.1 括注）；导出 OKF Bundle（对应主 PRD REQ-7.6，v0.2 新增，见本文 REQ-7.6.x）。
+**P0.5（尽力，可降级）**：导出 OKF Bundle（对应主 PRD REQ-7.6，v0.2 新增，见本文 REQ-7.6.x）。
+
+**随 F6 转 P1（v0.3）**：Clip 勾选与 Clip 的"AI 压缩版"。
 
 **Out of Scope**：Pack 内容的语义去重与自动排序优化；按任务描述自动推荐勾选项（P1）；Pack 云同步/分享；把 Lens 内容打包（原则性排除）；agent 侧写回 Pack（MCP 对 Pack 只读，与主 PRD §4.2 安全约定一致）；MCP `export_okf_bundle` 工具为 **P1**（主 PRD §4.2 v0.2 新增，MVP 内仅提供 UI 导出入口，agent 侧导出不做）。
 
@@ -38,8 +40,9 @@ Context Pack 是 PrismDocs 的"按需组装外部记忆"：用户勾选 Document
 |---|---|---|
 | F1 项目与文档导入 | F7 依赖 F1 | Pack 的 Document 源为 F1 同步的磁盘 Base 文件；文档树勾选器复用 F1 的文档树数据；archived 文档在勾选器中置灰 |
 | F5 理解卡片 | F7 依赖 F5 | 读取卡片的 context-worthy 标记与"英文注入行"字段（REQ-5.5）；F7 不修改卡片数据 |
-| F6 Chrome 剪藏 | F7 依赖 F6 | 读取 Clip 净化后 Markdown、元数据与 token 估算；`clip_used_in_pack` 埋点在 F7 侧触发 |
+| F6 Chrome 剪藏（随 F6 为 P1） | F7 依赖 F6 | 读取 Clip 净化后 Markdown、元数据与 token 估算；`clip_used_in_pack` 埋点在 F7 侧触发（P1 生效） |
 | F4 评论回流 | 并列，共享基础设施 | 共用 `.prismdocs/` 目录约定、本地 MCP Server 进程与 tokenizer 组件；Feedback Bundle 与 Context Pack 语义独立，互不引用 |
+| F8 跨项目知识层（v0.3 新增） | F8 → F7 | 漂移警示详情提供「把上游契约加入 Pack」快捷入口；Workspace 作用域勾选（REQ-7.1.1）是跨项目上下文的 MVP 交付通道（MCP `list_dependencies` 为 P1） |
 
 ## 3. 用户故事与关键场景
 
@@ -57,11 +60,11 @@ Context Pack 是 PrismDocs 的"按需组装外部记忆"：用户勾选 Document
 
 ### REQ-7.1 组装器（细化）
 
-- **REQ-7.1.1** 树形勾选器分三个分区：Documents（镜像 F1 文档树目录结构）、Cards（按更新时间倒序，context-worthy 置顶）、Clips（按剪藏时间倒序，可按项目筛选）。支持父节点全选/半选、搜索过滤。
+- **REQ-7.1.1**（v0.3 修订，Workspace 作用域）树形勾选器分区：Documents——默认展示当前项目文档树（镜像磁盘目录结构），其上提供「其他项目」分组（按项目折叠，契约文档带徽标置顶；典型用法：client 的 Pack 带上 server 的契约文档）；Cards（全 Workspace，context-worthy 置顶）；Clips（随 F6 为 P1，P1 前该分区隐藏）。支持父节点全选/半选、搜索过滤。
 - **REQ-7.1.2** 每个可勾选项右侧实时显示该项 token 数；卡片区分「注入行 only」（默认）与「注入行 + 正文」两档，切换即时反映到 token 条。
 - **REQ-7.1.3** 默认勾选逻辑：本项目全部 context-worthy 卡片预勾选（= 主 PRD REQ-7.4）；Document 与 Clip 默认不勾选；从模板打开时按模板记录恢复勾选。
 - **REQ-7.1.4** 实时 token 条：底部常驻，显示 总数 / 预算、按来源类型（Docs/Cards/Clips）分色堆叠占比；每次勾选变化 ≤200ms 内更新（长文档 token 数预计算缓存）。
-- **REQ-7.1.5**（P0.5）Clip 可选"AI 压缩版"：调用 LLM 生成英文要点摘要（保留代码块原文），压缩版与原文并存，勾选器中显示两者 token 对比；压缩失败回退原文。
+- **REQ-7.1.5**（随 F6 为 P1，v0.3 调整）Clip 可选"AI 压缩版"：调用 LLM 生成英文要点摘要（保留代码块原文），压缩版与原文并存，勾选器中显示两者 token 对比；压缩失败回退原文。
 
 ### REQ-7.2 输出格式（细化）
 
@@ -281,3 +284,4 @@ We decided this after load testing at 10k users...
 |---|---|---|
 | v0.1 | 2026-07-26 | 初稿 |
 | v0.2 | 2026-07-26 | 同步主 PRD v0.2：新增 REQ-7.6.1～7.6.5（导出 OKF Bundle 细化：入口、目录结构、frontmatter 物化、跨链接重写、conformance 与导出报告，含目录树与 Card frontmatter 示例）；§2 范围补入导出 OKF Bundle（P0.5）与 MCP `export_okf_bundle`（P1）边界；§5 补导出流程交互；§7 追加 E12–E14；§8 追加 `okf_bundle_exported` 埋点；§9 追加 AC-7d |
+| v0.3 | 2026-07-28 | 同步主 PRD v0.3：REQ-7.1.1 组装器升级 Workspace 作用域（「其他项目」分组、契约徽标）；Clip 勾选与 AI 压缩随 F6 转 P1（§2 范围、REQ-7.1.5、接口表）；接口表新增 F8 联动行（漂移警示→Pack 快捷入口，MVP 跨项目上下文交付通道） |

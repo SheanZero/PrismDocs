@@ -3,9 +3,9 @@
 | 项目 | 内容 |
 |---|---|
 | 文档类型 | 子 PRD — F4 评论回流 AI ★ 核心闭环 |
-| 版本 | v0.2（同步主 PRD v0.2：Agent 贡献溯源 + OKF 协议声明） |
-| 日期 | 2026-07-26 |
-| 上游文档 | 主 PRD v0.2 §3-F4、§4 Agent 集成协议（整节细化）、§3-F3（上游评论）、§6 埋点；BRD v0.2 §6.2 |
+| 版本 | v0.3（同步主 PRD v0.3：MCP 传输定案 D-07、复核界面修订、REQ-4.8 变更时间线立项、承载 F8 核对 Bundle） |
+| 日期 | 2026-07-28 |
+| 上游文档 | 主 PRD v0.3 §3-F4、§4 Agent 集成协议（整节细化）、§3-F3（上游评论）、§3-F8（核对 Bundle）、§6 埋点；BRD v0.3 §6.2/§6.5 |
 | 作者 | Shean（起草协作：Claude） |
 
 ---
@@ -39,7 +39,7 @@ resolved 且此前经过 sent/needs-review → 上报 `loop_closed`（§9）。
 
 ## 2. 范围
 
-**In Scope**：Bundle 生成与格式；回流面板交互；文件协议交付 + 剪贴板指令；本地 MCP Server 全部工具面（含 F7 的 `get_context_pack`、F5 的 `list_cards`——工具宿主在 F4，内容由对应功能供给）；Claude Code hook/skill 一键安装；回执匹配与文件变更兜底检测；needs-review 复核界面；Bundle 历史；48h 无响应提醒；`.prismdocs/` 目录与 CLAUDE.md 协议文案。
+**In Scope**：Bundle 生成与格式；回流面板交互；文件协议交付 + 剪贴板指令；本地 MCP Server 全部工具面（含 F7 的 `get_context_pack`、F5 的 `list_cards`——工具宿主在 F4，内容由对应功能供给）；Claude Code hook/skill 一键安装；回执匹配与文件变更兜底检测；needs-review 复核界面；Bundle 历史；48h 无响应提醒；`.prismdocs/` 目录与 CLAUDE.md 协议文案。v0.3 新增：承载 F8 核对 Bundle（frontmatter 带 `drift_check: true`，生成入口与内容属 F8 REQ-8.4，交付与三信号回收复用本功能）；REQ-4.8 变更时间线（立项，见 §4）。
 
 **Out of Scope**：评论创建与锚点迁移（F3）；Lens 重投影本身（F2，F4 只触发）；Context Pack 组装 UI（F7）；agent 侧行为质量（不控 agent 是否改得好，只保证输入结构化、输出可复核）；多人协作回流、GitHub PR 集成（P1）。
 
@@ -59,7 +59,7 @@ resolved 且此前经过 sent/needs-review → 上报 `loop_closed`（§9）。
 ## 3. 用户故事与关键场景
 
 **S1 · 全自动路径（Claude Code + MCP + hook，一级支持）**
-Shean 在 Lens 上写完 3 条评论，点「发给 AI」。PrismDocs 写入 Bundle 并经 MCP 可见；Claude Code 的 hook 在下次会话提示 agent 有未处理反馈，agent 调 `get_feedback` 逐条处理、改 Base、逐条 `respond_to_comment` 回执。PrismDocs 收到回执 + 检测到文件变更 → 评论转 needs-review，Inbox 弹出「AI 已修改 2 处待复核」。Shean 在 diff+评论并排视图复核，resolve。全程除在 Claude Code 里说一句话（或 hook 自动）外零手工拷贝。
+Shean 从速读区定位、在 Base 段落上写完 3 条评论，点「发给 AI」。PrismDocs 写入 Bundle 并经 MCP 可见；Claude Code 的 hook 在下次会话提示 agent 有未处理反馈，agent 调 `get_feedback` 逐条处理、改 Base、逐条 `respond_to_comment` 回执。PrismDocs 收到回执 + 检测到文件变更 → 评论转 needs-review，Inbox 弹出「AI 已修改 2 处待复核」。Shean 在 diff+评论并排视图复核，resolve。全程除在 Claude Code 里说一句话（或 hook 自动）外零手工拷贝。
 
 **S2 · 纯文件协议降级路径（未装 MCP，AC-4c）**
 Cursor 用户小李点「回流」，产品写入 `.prismdocs/feedback/2026-07-26T1030-a1b2.md` 并复制一句话指令到剪贴板；他粘贴到 Cursor 对话框。agent 读文件、改 Base、无任何回执。PrismDocs 的 FS watcher 检测到被评 Block 所在文件变更且 diff 命中该 Block → 评论自动转 needs-review。闭环达成，只是「未命中」判定精度低于 MCP 路径。
@@ -151,7 +151,7 @@ You are receiving structured review feedback from the human reviewer...
 - **REQ-4.4.1** MCP 回执信号：收到合法 `respond_to_comment` → 对应评论立即转 needs-review，记录 action/note/时间。
 - **REQ-4.4.2** 文件回执信号（降级）：watcher 检测到 Bundle 文件自身被修改 → 解析 Receipt 勾选区，等效回执。
 - **REQ-4.4.3** 文件变更兜底信号：Base 文档变更（F1 事件）且 diff 命中被评 Block（算法见 §7.3）→ sent 评论转 needs-review，标注「由文件变更检测触发（无 agent 回执）」。三种信号幂等合并，先到先转，后到补充信息。
-- **REQ-4.4.4** 转 needs-review 时：触发 F2 增量重投影；推 Inbox 通知（聚合同一 Bundle 的多条）。
+- **REQ-4.4.4** 转 needs-review 时：触发 F2 速读区重生成与 Base 变更条高亮（全文 Lens 回归后为增量重投影，v0.3 修订）；推 Inbox 通知（聚合同一 Bundle 的多条）。
 - **REQ-4.4.5** 复核界面（§6.3）中 resolve → 上报 `loop_closed`，并按 REQ-5.4 提示写卡片；reopen → 状态 reopened，可追评后再次回流。
 
 ### REQ-4.5 提问类评论的回答
@@ -178,9 +178,13 @@ You are receiving structured review feedback from the human reviewer...
 - **REQ-4.7.4 数据结构预留**：每条变更记录持久化 `actor`（agent_kind / user / unknown）、`trigger`（bundle_id + comment_id / 空）、`timestamp`、`confidence`（explicit / inferred / unknown）四字段，为 OKF v0.2 provenance 方向预留（届时可物化导出，本版不导出）。
 - **REQ-4.7.5 external-unknown 特殊提示**：`external-unknown` 变更命中被评论 Block 时，复核界面显著提示「此修改并非来自你的评论回流，请留意」——防止来源不明内容被误 resolve 后进入上下文传播。
 
-### 新增需求（主 PRD 未覆盖，需回填）
+### REQ-4.8 变更时间线与 Block 溯源（主 PRD v0.3 新增，P0；本文档 v0.3 仅立项）
 
-- **REQ-4.NEW-1**（回填 §4.2）：MCP 传输与冲突策略——首选 stdio（由 agent 配置以命令方式拉起轻量代理连接桌面端），兼容本地回环 HTTP/SSE；HTTP 端口默认 127.0.0.1:23816，占用时自动递增并把实际端口写入 `.prismdocs/mcp.json` 供代理发现；多项目共用单一 server，按调用方项目根路径路由数据（见 §8）。
+主 PRD REQ-4.8 定义：文档变更历史升级为**时间线视图**（版本 diff × 驱动评论线程 × agent 回执 × 执行者），任意 Block 提供「这段为什么是这样」入口；external-unknown 变更如实标注"来源不明"；被溯源记录引用的版本快照不参与存储淘汰。数据全部来自本文档既有的 `feedback_bundle` / `comment_receipt` / REQ-4.7 溯源字段与 F1 的 `document_version`——**纯呈现层，无新数据面**。交互细化（时间线 UI、Block blame 面板）待 UI/UX Spec；验收暂以主 PRD 口径为准。团队版扩展（多人身份、git 便携共享）为 P1（主 PRD Q9）。
+
+### 新增需求（主 PRD v0.3 已收编 / 修订）
+
+- **REQ-4.NEW-1**（v0.3 修订，已按主 PRD v0.3 §4.2 定案为 **D-07**，原 stdio 方案作废）：MCP 传输 = 桌面应用自身托管的 **loopback streamable HTTP**（`127.0.0.1:<port>`），per-install bearer token（存系统钥匙串）+ 非空 Origin allowlist；无子进程、无 stdio 代理。端口占用时自动递增，实际端口写入 `.prismdocs/mcp.json` 供发现；多项目共用单一 server，按调用方项目根路径路由数据（见 §8）。配套轻量 CLI helper（`prismdocs-helper`）：承担 Claude Code `headersHelper`（从钥匙串读 token，token 绝不落入可提交文件）与 SessionStart hook 的 check-feedback 提示。
 - **REQ-4.NEW-2**（回填 §3-F4）：「重新回流」——48h 无响应或用户主动时，允许把 sent 评论重新打入新 Bundle；新 Bundle frontmatter 带 `resend_of: <bundle_id>`，指令头追加一句 "Some items were re-sent because no response was recorded."。
 - **REQ-4.NEW-3**（回填 §3-F4）：Bundle 撤回——发出后未收到任何信号前可「撤回」：删除 feedback 文件、MCP 列表中移除、评论回退 open。已产生任一回执信号后不可撤回。
 
@@ -233,18 +237,22 @@ You are receiving structured review feedback from the human reviewer...
 
 设置页「连接 Claude Code」向导，三步、每步展示将写入的片段并征求确认：
 
-1. **MCP 注册**：生成命令供用户执行或直接代写项目级 `.mcp.json`：
+1. **MCP 注册**（v0.3 按 D-07 修订）：生成命令供用户执行或直接代写项目级 `.mcp.json`——HTTP 形态 + `headersHelper` 间接读取 token（**token 本体只存钥匙串，绝不写入可提交文件**）：
 
 ```json
 { "mcpServers": { "prismdocs": {
-    "command": "prismdocs-mcp", "args": ["--project", "."] } } }
+    "type": "http",
+    "url": "http://127.0.0.1:23816/mcp",
+    "headersHelper": "prismdocs-helper mcp-headers" } } }
 ```
+
+（实际端口由向导从 `.prismdocs/mcp.json` 读取填入；端口后续变化——仅发生在被占用递增时——由向导检测失配并提示一键更新。）
 
 2. **Hook（SessionStart 提醒）**：追加到 `.claude/settings.json`，会话启动时提示未处理反馈：
 
 ```json
 { "hooks": { "SessionStart": [ { "hooks": [ { "type": "command",
-  "command": "prismdocs-mcp --check-feedback --project . 2>/dev/null || true" } ] } ] } }
+  "command": "prismdocs-helper check-feedback --project . 2>/dev/null || true" } ] } ] } }
 ```
 
 （命令在有未处理 Bundle 时输出一行英文提示注入上下文，无则静默；工具不存在时 `|| true` 保证不破坏用户会话。）
@@ -303,11 +311,12 @@ This project is reviewed in PrismDocs. Human feedback arrives as bundles in
 │ 你的评论(✏️): 并发写入会不会有问题？如果用户超过1万怎么办        │
 │ agent 回执: done — "Added WAL-mode analysis and a migration    │
 │            plan section." · 2026-07-26 11:02                   │
-│ ┌─ Base 变更 diff ─────────────┬─ Lens（重投影后）────────────┐ │
-│ │ - SQLite is chosen for…      │ 这段更新了：AI 补充了 WAL     │ │
-│ │ + SQLite (WAL mode) is…      │ 模式下的并发分析，并新增了    │ │
-│ │ + ### Migration plan (>10k)  │ 「超过 1 万用户的迁移预案」…  │ │
-│ └──────────────────────────────┴──────────────────────────────┘ │
+│ ┌─ Base 变更 diff（v0.3：diff 与评论/回执并排，Lens 列随全文 Lens P1）┐ │
+│ │ - SQLite is chosen for…                                          │ │
+│ │ + SQLite (WAL mode) is…                                          │ │
+│ │ + ### Migration plan (>10k)                                      │ │
+│ │ ▸ 右缘挂载：本条评论线程 + agent 回执 + 溯源标注（REQ-4.7.3）      │ │
+│ └──────────────────────────────────────────────────────────────────┘ │
 │        [✓ 通过 (resolve)]  [↩ 不行，重开 (reopen) + 追评]       │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -353,9 +362,9 @@ comment_id 为唯一匹配键（Bundle 与 MCP 返回中均携带）；Receipt �
 | 5 | agent 改了被评 Block 但改的与评论无关 | 产品无法判意图 → 仍转 needs-review，由复核界面的 diff+评论并排交给人判断（reopen 兜底） |
 | 6 | 提问类评论 agent 却改了文档 | 转 needs-review 并提示「此条为提问但检测到变更」（REQ-4.5.2） |
 | 7 | `respond_to_comment` 携带非法/已 resolve 的 comment_id | 返回 error，不改状态，记审计日志 |
-| 8 | MCP 端口被占用 | 自动递增端口并更新 `.prismdocs/mcp.json`；stdio 代理不受影响（REQ-4.NEW-1） |
+| 8 | MCP 端口被占用 | 自动递增端口并更新 `.prismdocs/mcp.json`；向导检测 `.mcp.json` 端口失配时提示一键更新（REQ-4.NEW-1 v0.3） |
 | 9 | 多项目并发（两个项目同时回流） | 单 server 按项目根路由；`list_feedback` 仅返回调用方项目的 Bundle |
-| 10 | 桌面端未运行时 agent 调 MCP | stdio 代理返回明确错误文案，指引 agent 改读 `.prismdocs/feedback/` 文件 |
+| 10 | 桌面端未运行时 agent 调 MCP | HTTP 连接被拒 → agent 侧表现为 MCP server 不可用；CLAUDE.md 协议段与 `.prismdocs/README.md` 指引 agent 兜底改读 `.prismdocs/feedback/` 文件（v0.3） |
 | 11 | agent 直接删除/篡改 Bundle 文件正文 | 本地库存有权威副本；仅 Receipt 区变更被解析，其余篡改忽略并在历史标注 |
 | 12 | 回流后用户在 PrismDocs 编辑了同一 Block | 本地编辑不触发兜底（§7.3-4）；评论 quote 保持发送时快照 |
 | 13 | Bundle 中文件随后被重命名/删除 | F1 哈希识别随迁：历史与回收逻辑跟随新路径；删除则评论按 F3 降级，Bundle 历史标注「目标已删除」 |
@@ -388,7 +397,7 @@ comment_id 为唯一匹配键（Bundle 与 MCP 返回中均携带）；Receipt �
 
 继承 AC-4a/4b/4c，细化端到端脚本：
 
-**AC-4a-1（Claude Code 全自动路径）**：真实项目装好 MCP+hook+CLAUDE.md 片段 → Lens 上创建 3 条评论（✏️×1、💬×1、❌×1）→ 回流 → 新开 Claude Code 会话，hook 提示后 agent 自行完成 `get_feedback`→改 Base→3 条 `respond_to_comment` → 验证：3 条均转 needs-review 且提问答复在线程内；Lens 受影响段重投影+高亮；逐条复核 resolve → 3 条 `loop_closed` 上报。全程唯一人工输入为评论与复核点击。
+**AC-4a-1（Claude Code 全自动路径，v0.3 口径）**：真实项目装好 MCP+hook+CLAUDE.md 片段 → 经速读区定位在 Base 上创建 3 条评论（✏️×1、💬×1、❌×1）→ 回流 → 新开 Claude Code 会话，hook 提示后 agent 自行完成 `get_feedback`→改 Base→3 条 `respond_to_comment` → 验证：3 条均转 needs-review 且提问答复在线程内；速读区重生成 + 受影响 Block 变更条高亮；逐条复核 resolve → 3 条 `loop_closed` 上报。全程唯一人工输入为评论与复核点击。
 
 **AC-4a-2（Cursor / 文件协议路径）**：不装 MCP → 回流 2 条 ✏️ 评论 → 粘贴剪贴板指令到 Cursor → agent 改 Base（无回执）→ 验证：兜底检测在 FS 事件后 10s 内将 2 条转 needs-review（source=fs_change）→ 复核 1 条 resolve、1 条 reopen 追评再回流，新 Bundle 不含已 resolve 项。
 
@@ -424,3 +433,4 @@ comment_id 为唯一匹配键（Bundle 与 MCP 返回中均携带）；Receipt �
 |---|---|---|
 | v0.1 | 2026-07-26 | 初稿 |
 | v0.2 | 2026-07-26 | 同步主 PRD v0.2：新增 REQ-4.7 Agent 贡献溯源细化（REQ-4.7.1～4.7.5：来源分类/归因方法/复核展示/OKF provenance 数据结构预留/external-unknown 提示）；§5.1 README 草案声明 OKF v0.1 约定、§5.2 MCP 工具面追加 export_okf_bundle（P1）；§8 边界情况追加 #17/#18（归因歧义、回执与变更不符）；§9 埋点追加变更来源分布；§10 追加 AC-4d（溯源） |
+| v0.3 | 2026-07-28 | 同步主 PRD v0.3：①REQ-4.NEW-1 修订为 D-07（app 内嵌 loopback streamable HTTP + bearer + Origin allowlist，stdio 方案作废；§5.3 `.mcp.json`/hook 示例改 `prismdocs-helper`，§8-8/-10 同步）；②复核界面改 Base diff + 评论并排（§6.3 线框，Lens 列随全文 Lens P1）；③REQ-4.4.4 触发目标改速读区重生成；④新增 REQ-4.8 变更时间线立项（纯呈现层）；⑤In Scope 增承载 F8 核对 Bundle；⑥S1/AC-4a-1 措辞改速读区+Base 口径 |
