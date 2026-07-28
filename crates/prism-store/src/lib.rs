@@ -2,16 +2,18 @@
 //!
 //! 对外只有三件东西：sidecar 路径解析（[`data_root`] / [`default_db_path`]）、
 //! 库的打开流程与并发纪律（[`open`] / [`Store`]，见 `open.rs` 的 writer-first 六步序）、
-//! 以及 schema 迁移集合（[`migrations`]）。
+//! schema 迁移集合（[`migrations`]），以及查询层（[`search`]，按长度分流的 trigram/LIKE 搜索）。
 
 pub mod error;
 pub mod migrations;
 mod open;
+pub mod search;
 
 use std::path::PathBuf;
 
 pub use error::StoreError;
 pub use open::{open, Store, BUSY_TIMEOUT_MS, MIN_SQLITE, READ_POOL_MAX_SIZE};
+pub use search::{escape_fts_query, search, MIN_TRIGRAM_CHARS};
 
 /// sidecar 数据根的目录名（D-13：`~/Library/Application Support/PrismDocs/`）。
 const DATA_DIR_NAME: &str = "PrismDocs";

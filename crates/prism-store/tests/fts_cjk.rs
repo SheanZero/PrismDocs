@@ -67,6 +67,10 @@ fn chinese_query_returns_nonzero_rows() {
     // ⑤ 阴性对照。删掉它，「搜索永远返回全部」这种实现也能让 ①–④ 全绿。
     assert_eq!(n(&store, "p1", "量子纠缠"), 0, "库中不存在的词应返回 0 行");
 
+    // ⑤b **回退分支自己的**阴性对照。⑤ 是 4 字词，走的是 MATCH——把 LIKE 分支写成
+    //     无条件返回全部行，⑤ 照样绿。两条分支各要一条阴性对照，缺一条就有半边恒真。
+    assert_eq!(n(&store, "p1", "量子"), 0, "回退分支上不存在的词也应返回 0 行");
+
     // ⑥ FTS5 查询语法层的注入：`"` 与布尔算子在 MATCH 串里有特殊含义，
     //    参数绑定只挡 SQL 层挡不住这层。未转义时这里会是 `fts5: syntax error`（Err）而非 0 行。
     assert_eq!(
@@ -110,6 +114,24 @@ fn fts_index_follows_update_and_delete() {
         .expect("delete");
 
     assert_eq!(n(&store, "p1", "全新内容"), 0, "DELETE 后应归零");
+
+    // 上面那条断言**单独存在时守不住 documents_ad**：JOIN 会把 documents 表里已经消失的
+    // 行过滤掉，哪怕 FTS 索引里还留着陈旧条目，结果照样是 0 行。陈旧条目的真实后果要等到
+    // 新文档复用同一个 rowid_pk 时才显形——那时旧词会指向一篇根本不含它的新文档。
+    // 实测：阉割 documents_ad 后只有下面这条变红，上面那条依然绿。
+    store
+        .write(|tx| {
+            tx.execute(INSERT_DOC, ("d2", "p1", "b.md", "另一篇", "这篇只谈别的主题。"))?;
+            Ok(())
+        })
+        .expect("insert after delete");
+
+    assert_eq!(
+        n(&store, "p1", "全新内容"),
+        0,
+        "陈旧的 FTS 条目不得把旧词指向复用了 rowid_pk 的新文档"
+    );
+    assert_eq!(n(&store, "p1", "别的主题"), 1, "新文档自身应可被搜到");
 }
 
 /// `VACUUM` 会重编号**没有显式 INTEGER PRIMARY KEY** 的表的 rowid。external content FTS
