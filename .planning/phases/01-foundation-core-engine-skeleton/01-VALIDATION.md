@@ -56,6 +56,7 @@ Loopback integration tests bind `TcpListener::bind("127.0.0.1:0")` (OS-assigned 
 | TBD | TBD | TBD | NFR-02 | — | `Migrations::validate()` passes | unit | `cargo test -p prism-store migrations_validate` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | NFR-02 | — | Open + read an existing DB with no network | unit | `cargo test -p prism-store offline_open_and_read` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | NFR-02 | — | Backup/export yields a standalone file; row counts match | integration | `cargo test -p prism-store backup_round_trip` | ❌ W0 | ⬜ pending |
+| TBD | TBD | TBD | NFR-02 | T-1-20 unrestorable backup | Restore with no marker and no registry row adopts the archive manifest's `project_id` rather than minting a new one | integration | `cargo test -p prism-store restore_from_archive_adopts_manifest_project_id` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | NFR-03 | T-1-06 egress sprawl | `reqwest` appears once in the dep graph, only under `prism-llm` | unit (manifest assertion) | `cargo test -p prism-core single_egress_path` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | NFR-03 | T-1-07 key in logs | `Debug` on the secret newtype renders no key material | unit | `cargo test -p prism-llm secret_debug_is_redacted` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | NFR-03 | — | No telemetry crate in `Cargo.lock` | unit (manifest assertion) | `cargo test -p prism-core no_telemetry_dependency` | ❌ W0 | ⬜ pending |
