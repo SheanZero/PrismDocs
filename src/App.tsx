@@ -52,15 +52,31 @@ export default function App() {
   const onDevRoute = route === DEV_ROUTE;
 
   // 失效链路在顶层挂**一次**：事件是粗粒度的，每个页面各挂一次只会重复失效。
-  useEngineInvalidation();
+  // 它建不起来时返回一句文案，必须渲染出来——失效链路死掉的表现是「数据一直是旧的」，
+  // 那与「数据本来就没变」在界面上完全同形，不说出来就永远发现不了。
+  const invalidationFailure = useEngineInvalidation();
 
   return (
     <>
+      {invalidationFailure && (
+        <p role="alert" style={alertBar}>
+          {invalidationFailure}
+        </p>
+      )}
       {onDevRoute ? <DevSmokePage /> : <SettingsPage />}
       <DevRouteToggle onDevRoute={onDevRoute} />
     </>
   );
 }
+
+// 一行告警条，不是布局系统（D-06 禁的是投机建导航/侧栏/正式排布）。
+const alertBar = {
+  margin: 0,
+  padding: "0.5rem 1rem",
+  background: "#fff4e5",
+  borderBottom: "1px solid #f0c99a",
+  fontSize: "0.85rem",
+} as const;
 
 const toggle = {
   position: "fixed",

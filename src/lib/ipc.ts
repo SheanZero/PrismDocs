@@ -46,7 +46,17 @@ const ERROR_COPY: Record<string, string> = {
   task_failed: "后台任务没能完成，请重试。",
   channel_send_failed: "数据流通道已关闭。",
   engine_error: "引擎遇到一个内部错误。",
+  listen_failed: "事件通道未能建立，界面不会随引擎变更自动刷新。",
 };
+
+/// `listen()` 建不起来时用的码。
+///
+/// 它不是引擎命令返回的短码，而是**前端自造**的一个：`listen` 走的是插件命令
+/// `plugin:event|listen`，被 Tauri ACL 拒绝时 reject 出来的是一段原始英文 ACL 文本
+/// （"event.listen not allowed. Permissions associated with this command: …"）。
+/// 那段文本既不该进 DOM，也不该走 `errorCopy` 的兜底——兜底文案「操作失败，请重试」
+/// 会把「本页从此收不到任何事件」说成一次可重试的操作失败。
+export const LISTEN_FAILED = "listen_failed";
 
 /// 把命令错误译成中文文案。
 ///

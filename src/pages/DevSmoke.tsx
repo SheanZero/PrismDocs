@@ -9,6 +9,7 @@ import {
   errorCopy,
   searchDocuments,
   EVENT_CHANGED,
+  LISTEN_FAILED,
   type EngineEvent,
   type SearchHit,
   type SmokeEvent,
@@ -74,12 +75,26 @@ export default function DevSmokePage() {
   // 计数器走一条**独立**的 listen，与 useEngineInvalidation 的失效路径分开——
   // 这样「事件到了几次」是可直接读的数字，而不是要从 refetch 次数反推的东西。
   // cleanup 与 hook 侧同形：listen 返回 Promise<UnlistenFn>，漏掉它计数就会翻倍。
+  //
+  // **两个分支都必须接住 rejection。** `listen` 走插件命令 `plugin:event|listen`，受 ACL 管辖；
+  // 而 `invoke('dev_emit_bus_event')` 是 generate_handler! 注册的自有命令，不过 ACL。
+  // 于是 capability 缺失时发射照常成功、监听从未注册，计数停在 0 且毫无报错——
+  // 因为 rejection 落进了没人接的 Promise。计数为 0 在正常状态下同样成立，指不出问题。
   useEffect(() => {
+    let active = true;
     const pending = listen<EngineEvent>(EVENT_CHANGED, () => {
       setEventCount((n) => n + 1);
     });
+    pending.catch(() => {
+      if (active) setNotice(errorCopy(LISTEN_FAILED));
+    });
     return () => {
-      pending.then((unlisten) => unlisten());
+      active = false;
+      // 两参形式而不是 .then(un => un())：后者在 listen 失败时自己也是一个未处理的 rejection。
+      pending.then(
+        (unlisten) => unlisten(),
+        () => {},
+      );
     };
   }, []);
 

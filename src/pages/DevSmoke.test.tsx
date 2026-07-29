@@ -145,6 +145,21 @@ describe("DevSmokePage", () => {
     ).toBe("2");
   });
 
+  // 真实发生过的失败：capability 缺失时 `listen()` 被 ACL 拒绝，而 `invoke` 的自有命令
+  // 不过 ACL 照常成功——点按钮没有任何报错，计数停在 0。rejection 落进 `const pending = listen(...)`
+  // 这个没有 .catch 的 Promise 里，整类失败就此消失。计数为 0 不足以作断言：正常状态下它也是 0。
+  it("surfaces a rejected listen instead of silently sitting at zero", async () => {
+    listenSpy.mockRejectedValueOnce(
+      "event.listen not allowed. Permissions associated with this command: core:event:allow-listen",
+    );
+    renderPage();
+
+    const notice = await screen.findByRole("status");
+    expect(notice.textContent ?? "").toContain("事件通道");
+    // Tauri 的原始 ACL 文本是内部细节，不得原样进 DOM（与命令错误码同一条规矩）。
+    expect(notice.textContent ?? "").not.toContain("not allowed");
+  });
+
   it("streams with total=1000 and reports the seq verdict", async () => {
     renderPage();
 
