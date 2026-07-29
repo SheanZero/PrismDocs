@@ -46,18 +46,26 @@ export const SETTING_BASE_URL = "llm.base_url";
 ///
 /// 二选一（无原型容器 / `Object.hasOwn` 判定）里选前者：后者要求**每一个**查找点都记得
 /// 那样写，那是约定；容器没有原型链则是机制，第二个查找点加进来时也不会出事。
-const ERROR_COPY: Record<string, string> = Object.assign(Object.create(null), {
-  invalid_url: "链接必须以 http:// 或 https:// 开头，并带有主机名。",
-  invalid_url_credentials:
-    "端点链接里不能带用户名或密码（形如 user:pass@host），也不能带查询串（?…）或锚点（#…）。密钥请填在上面的 API key 栏——它只进系统钥匙串，不入数据库。",
-  invalid_setting: "这个配置项不被接受（疑似密钥的键名一律不入库）。",
-  store_error: "写入本地数据库失败，请重试。",
-  secret_error: "系统钥匙串当前不可用，密钥没有保存。",
-  task_failed: "后台任务没能完成，请重试。",
-  channel_send_failed: "数据流通道已关闭。",
-  engine_error: "引擎遇到一个内部错误。",
-  listen_failed: "事件通道未能建立，界面不会随引擎变更自动刷新。",
-});
+///
+/// `Object.create(null)` 的静态类型是 `any`，于是整个 `Object.assign(...)` 也是 `any`，
+/// 赋给 `Record<string, string>` 会被 `no-unsafe-assignment` 命中（01-26 lint 闸门首跑）。
+/// 这里把断言写在 `Object.create(null)` 上而**不是**关掉那条规则：运行期语义分毫未变
+/// （容器仍然没有原型链，这是本注释上半段的全部要点），只是把 `any` 收窄在一个表达式内。
+const ERROR_COPY: Record<string, string> = Object.assign(
+  Object.create(null) as Record<string, string>,
+  {
+    invalid_url: "链接必须以 http:// 或 https:// 开头，并带有主机名。",
+    invalid_url_credentials:
+      "端点链接里不能带用户名或密码（形如 user:pass@host），也不能带查询串（?…）或锚点（#…）。密钥请填在上面的 API key 栏——它只进系统钥匙串，不入数据库。",
+    invalid_setting: "这个配置项不被接受（疑似密钥的键名一律不入库）。",
+    store_error: "写入本地数据库失败，请重试。",
+    secret_error: "系统钥匙串当前不可用，密钥没有保存。",
+    task_failed: "后台任务没能完成，请重试。",
+    channel_send_failed: "数据流通道已关闭。",
+    engine_error: "引擎遇到一个内部错误。",
+    listen_failed: "事件通道未能建立，界面不会随引擎变更自动刷新。",
+  },
+);
 
 /// `listen()` 建不起来时用的码。
 ///

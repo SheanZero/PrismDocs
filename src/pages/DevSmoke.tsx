@@ -171,8 +171,16 @@ export default function DevSmokePage() {
         <p>
           收到事件次数：<strong data-testid="event-count">{eventCount}</strong>
         </p>
+        {/*
+          四个 handler 都是 `async`，而 `onClick` 的签名要求返回 `void`——直接
+          `onClick={handleEmit}` 把一个 Promise 交给一个丢弃返回值的位置，正是
+          `no-misused-promises` 守的形态（01-26 lint 闸门首跑点出的四处）。
+          这四个 handler 内部各有完整 try/catch，所以 `void` 是准确的意思表达
+          （「刻意不等它，且它不会 reject」），与本仓库已有的 `void
+          queryClient.invalidateQueries()` 同一约定。
+        */}
         <div style={row}>
-          <button type="button" onClick={handleEmit}>
+          <button type="button" onClick={() => void handleEmit()}>
             触发总线事件
           </button>
           <button type="button" onClick={() => setEventCount(0)}>
@@ -188,7 +196,11 @@ export default function DevSmokePage() {
           Started 在首、Finished 在末。
         </p>
         <div style={row}>
-          <button type="button" onClick={handleStream} disabled={streaming}>
+          <button
+            type="button"
+            onClick={() => void handleStream()}
+            disabled={streaming}
+          >
             Channel 有序流
           </button>
         </div>
@@ -210,7 +222,7 @@ export default function DevSmokePage() {
           它必须返回 0，否则命中数说明不了任何事。
         </p>
         <div style={row}>
-          <button type="button" onClick={handleSeed}>
+          <button type="button" onClick={() => void handleSeed()}>
             插入样例文档
           </button>
           <button type="button" onClick={() => setQuery("锚定引擎")}>
@@ -230,7 +242,7 @@ export default function DevSmokePage() {
           style={input}
         />
         <div style={row}>
-          <button type="button" onClick={handleSearch}>
+          <button type="button" onClick={() => void handleSearch()}>
             搜索
           </button>
         </div>

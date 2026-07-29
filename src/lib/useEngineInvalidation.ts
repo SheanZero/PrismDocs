@@ -28,10 +28,15 @@ export function useEngineInvalidation(): string | null {
       if (payload.kind === "resync") {
         // 全量失效。Lagged 之后丢了多少条、丢的是哪些 project 都不可知，
         // 按 key 失效等于替不可知的事实做假设。
-        queryClient.invalidateQueries();
+        //
+        // `void` 是 01-26 的 lint 闸门首跑加上的：`invalidateQueries` 返回 Promise，
+        // 而这里刻意不等它（失效是 fire-and-forget，等它等于把事件处理器阻塞到 refetch 落定）。
+        // 与 `Settings.tsx` / `DevSmoke.tsx` 已有的四个调用点同形——那四处本来就写了 `void`，
+        // 本文件这两处漏了，闸门装上的第一跑就把这条不一致点了出来。
+        void queryClient.invalidateQueries();
         return;
       }
-      queryClient.invalidateQueries({ queryKey: ["docs", payload.projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["docs", payload.projectId] });
     });
 
     pending.catch(() => {
