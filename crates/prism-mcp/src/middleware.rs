@@ -8,8 +8,33 @@
 //! 三层一律返回 **403 且空正文**。刻意不给 bearer 缺失单独用 401：状态码或正文的
 //! 任何差异都会告诉攻击者「你已经过了哪几层」，把三层试探变成逐层试探。
 //! 真实原因只进本地 `tracing`，不进响应。
+//!
+//! ### 这句话为什么在**实发路由**上也成立（01-REVIEW.md WR-03）
+//!
+//! `build_router` 刻意把 rmcp SDK 侧的 allowlist 配成同一份做防御纵深，而 **SDK 的
+//! 拒绝不是无差别的**：rmcp 2.2 `transport/streamable_http_server/tower.rs` 会回
+//! `forbidden_response("Forbidden: Host header is not allowed")`（403 **带正文**，
+//! 423 行）与 `bad_request_response("Bad Request: Invalid Host header")`（**400**
+//! 带正文，400 行）。两层都可达的成因是**解析口径不同**——SDK 用
+//! `http::uri::Authority::try_from`（RFC 3986，认 userinfo），本层曾经只取第一个
+//! `:` 之前的东西。两个实测可达的输入：
+//!
+//! - `Host: 127.0.0.1:80/evil` —— 本层给出 `127.0.0.1`（放行），SDK 解析失败 → **400 + 正文**
+//! - `Host: 127.0.0.1:80@evil.com` —— 本层给出 `127.0.0.1`（放行），SDK 按 userinfo
+//!   取到 `evil.com` → **403 + 正文**（状态码相同、正文不同，同样是层次 oracle）
+//!
+//! 因此 [`host_of`] 现在要求**两侧对同一个主机名达成一致**（01-17 选定的路径 A）：
+//! 不一致即在本层以 403 空正文拒掉，SDK 那两种带正文的形态在门禁面上不再可达，
+//! 上面那句话端到端为真。该性质由 `host_of_agrees_with_the_sdk_parser_or_denies`
+//! （源码级）与 `middleware_gate.rs::the_shipped_route_denies_every_layer_identically`
+//! （实发路由级）两条测试钉住。
+//!
+//! **范围**：本契约覆盖的是**三层门禁**的拒绝。SDK 的协议级错误（Accept 头不合规、
+//! 未知 session id 等）形态不同，但它们只在**通过 bearer 之后**可达，不构成未鉴权
+//! 的层次 oracle。
 
 use axum::extract::{Request, State};
+use axum::http::uri::Authority;
 use axum::http::{header, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -39,25 +64,55 @@ fn deny(reason: &'static str) -> Response {
 }
 
 /// 从 `Host` / Origin 的 authority 中取出主机名（剥端口、剥 IPv6 方括号），小写化。
+///
+/// **本层的判定必须与 rmcp SDK 内层就同一个主机名达成一致**（模块头 T-01-29 那一节）：
+/// 两侧算出不同主机名、或 SDK 那侧根本解析不出 authority 的输入，一律在这里拒掉。
+/// 少了这道闸门，就存在「过了本层、被 SDK 以另一种形态拒掉」的输入，而 SDK 的拒绝
+/// 带正文且状态码分化——那正是 T-01-29 禁止的可观测差异。
 fn host_of(authority: &str) -> Option<String> {
     let authority = authority.trim();
     if authority.is_empty() {
         return None;
     }
-    if let Some(rest) = authority.strip_prefix('[') {
+
+    let ours = if let Some(rest) = authority.strip_prefix('[') {
         // IPv6 字面量：`[::1]:8080` → `::1`
         let end = rest.find(']')?;
         let host = &rest[..end];
         if host.is_empty() {
             return None;
         }
-        return Some(host.to_ascii_lowercase());
-    }
-    let host = authority.split(':').next()?;
-    if host.is_empty() {
+        host.to_ascii_lowercase()
+    } else {
+        let host = authority.split(':').next()?;
+        if host.is_empty() {
+            return None;
+        }
+        host.to_ascii_lowercase()
+    };
+
+    // 一致性闸门。**不是**「改用 SDK 的解析器」而是「要求两者同意」——两个方向都要防：
+    //
+    // - SDK 解析不出来：`127.0.0.1:80/evil` 在本层给出 `127.0.0.1`（allowlist 内），
+    //   在 SDK 那边是 `Authority::try_from` 失败 → 400 + `Bad Request: Invalid Host
+    //   header`（rmcp 2.2 tower.rs:400）。
+    // - 两者算出不同主机：`127.0.0.1:80@evil.com` 在本层给出 `127.0.0.1`，SDK 按
+    //   RFC 3986 把前半段当 userinfo、host 取到 `evil.com` → 403 + `Forbidden: Host
+    //   header is not allowed`（tower.rs:423）。**状态码相同但正文不同**，一样是
+    //   层次 oracle；只用「SDK 能否解析」做闸门挡不住这一条。
+    //
+    // 反过来只用 SDK 的 `host()` 也不行：那等于把 userinfo 静默丢掉，本层会开始
+    // 放行 `evil.example.com@127.0.0.1`。要的是**两侧同意**，不是任选一侧。
+    let parsed = Authority::try_from(authority).ok()?;
+    if sdk_normalize_host(parsed.host()) != ours {
         return None;
     }
-    Some(host.to_ascii_lowercase())
+    Some(ours)
+}
+
+/// 逐字照抄 rmcp 2.2 `tower.rs:270-274` 的 `normalize_host`，用于上面的一致性比较。
+fn sdk_normalize_host(host: &str) -> String {
+    host.trim_matches('[').trim_matches(']').to_ascii_lowercase()
 }
 
 /// 拆 Origin 为 (scheme, host)，端口丢弃。形如 `scheme://host[:port]`，不接受路径。
@@ -75,13 +130,25 @@ fn origin_tuple(origin: &str) -> Option<(String, String)> {
 /// 且 `build_router` 把 SDK 侧的 allowlist 配成同一份——但 **SDK 的修复不替代这一层**：
 /// 它可被一行 `disable_allowed_hosts()` 关掉，且 SDK 大版本变更时这一层不动。
 pub async fn require_local_host(request: Request, next: Next) -> Response {
-    let Some(raw) = request.headers().get(header::HOST) else {
-        return deny("missing Host header");
+    let host = {
+        // HTTP/1.1 走 `Host` 头；HTTP/2 把 authority 放在 `:authority` 伪头里，
+        // hyper 不为它合成 `Host`（rmcp 自己也做同一个回退，tower.rs:403-409，
+        // 那条注释还点名 `axum::Router::nest` 可能丢掉合成头）。只认字面 `Host`
+        // 会让任何 h2 客户端拿到一个无从诊断的 403——本层刻意无诊断，误拒的代价
+        // 全由用户承担（同 WR-07 的推理）。
+        let raw = match request.headers().get(header::HOST) {
+            Some(raw) => match raw.to_str() {
+                Ok(raw) => raw,
+                Err(_) => return deny("non-ascii Host header"),
+            },
+            None => match request.uri().authority() {
+                Some(authority) => authority.as_str(),
+                None => return deny("missing Host header"),
+            },
+        };
+        host_of(raw)
     };
-    let Ok(raw) = raw.to_str() else {
-        return deny("non-ascii Host header");
-    };
-    let Some(host) = host_of(raw) else {
+    let Some(host) = host else {
         return deny("malformed Host header");
     };
     if !ALLOWED_HOSTS.iter().any(|allowed| *allowed == host) {
@@ -201,6 +268,136 @@ mod tests {
         assert_eq!(host_of(""), None);
         assert_eq!(host_of(":8080"), None);
         assert_eq!(host_of("[::1"), None);
+        // 端口不是数字是**合法** authority（实测：`Authority::try_from` 接受它、
+        // `port_u16()` 给 None、host 仍是 `127.0.0.1`），两侧一致 → 放行。
+        // 01-REVIEW.md WR-03 把它当作「过本层、被 SDK 以 400 拒掉」的例子，实测不成立；
+        // 真正可达的两个形态见下面 `host_of_agrees_with_the_sdk_parser_or_denies`。
+        assert_eq!(host_of("127.0.0.1:notanumber").as_deref(), Some("127.0.0.1"));
+        assert_eq!(host_of("127.0.0.1:").as_deref(), Some("127.0.0.1"));
+        // 两侧口径分叉的两个实测形态，现在一律在本层拒：
+        assert_eq!(host_of("127.0.0.1:80/evil"), None); // SDK 侧解析失败 → 400 + 正文
+        assert_eq!(host_of("127.0.0.1:80@evil.com"), None); // SDK 侧 host = evil.com → 403 + 正文
+        assert_eq!(host_of("evil.example.com@127.0.0.1"), None); // 反方向：SDK 会放行，本层不放
+    }
+
+    /// 让 SDK 那两种带正文的拒绝不可达的**那条性质**：本层与 SDK 对主机名达成一致。
+    ///
+    /// rmcp 2.2 `parse_host_header`（tower.rs:382-410）对 `Host` 头做
+    /// `http::uri::Authority::try_from`，失败即 `bad_request_response("Bad Request:
+    /// Invalid Host header")`（400 带正文）；解析成功但主机名不在 allowlist 里则是
+    /// `forbidden_response("Forbidden: Host header is not allowed")`（403 带正文）。
+    /// 本层放行的每一个 authority 都必须让 SDK 算出**同一个**主机名，否则就存在一个
+    /// 「过了应用层、被 SDK 以另一种形态拒掉」的输入——T-01-29 禁止的可观测差异。
+    #[test]
+    fn host_of_agrees_with_the_sdk_parser_or_denies() {
+        // 覆盖面刻意含**会被放行**的形态（阴性对照）：若本条只喂非法样本，
+        // 一个「一律返回 None」的 host_of 也能让它全绿。
+        let sample = [
+            "127.0.0.1:51234",
+            "localhost",
+            "LocalHost",
+            "[::1]:8080",
+            "[::1]",
+            "evil.example.com",
+            "evil.example.com:8080",
+            "127.0.0.1:notanumber",
+            "127.0.0.1:",
+            "127.0.0.1:99999999",
+            "127.0.0.1:0080",
+            "127.0.0.1:80/evil",
+            "127.0.0.1:80@evil.com",
+            "evil.example.com@127.0.0.1",
+            "127.0.0.1 51234",
+            "127.0.0.1?x",
+            "[::1",
+            ":8080",
+            "",
+        ];
+
+        let mut accepted = 0usize;
+        for authority in sample {
+            let Some(ours) = host_of(authority) else {
+                continue;
+            };
+            accepted += 1;
+            let parsed = Authority::try_from(authority.trim()).unwrap_or_else(|_| {
+                panic!(
+                    "本层放行了 {authority:?}，但 SDK 的 Authority::try_from 会拒它 —— \
+                     该请求会从 SDK 拿到一个带正文的 400"
+                )
+            });
+            assert_eq!(
+                sdk_normalize_host(parsed.host()),
+                ours,
+                "本层与 SDK 对 {authority:?} 算出了不同的主机名 —— \
+                 SDK 会用一个带正文的 403 拒它，三层的无差别拒绝就此破裂"
+            );
+        }
+        assert!(
+            accepted >= 5,
+            "样本里没有足够的放行形态，这条断言退化成恒真（accepted={accepted}）"
+        );
+    }
+
+    /// HTTP/2 把 authority 放在 `:authority` 伪头里，hyper 不为它合成 `Host`
+    /// （rmcp 自己也这么处理：tower.rs:403-409 的注释点名 `axum::Router::nest`
+    /// 可能丢掉合成头）。要求字面 `Host` 头会让任何 h2 客户端拿到一个无从诊断的 403。
+    #[tokio::test]
+    async fn require_local_host_falls_back_to_the_uri_authority() {
+        // 无 Host 头 + URI 带 loopback authority（HTTP/2 形态）→ 放行。
+        assert_eq!(
+            host_layer_status("http://127.0.0.1:51234/mcp", None).await,
+            StatusCode::OK,
+            "HTTP/2 形态（authority 在 URI 里）被无差别拒绝了"
+        );
+
+        // 同一形态换成外域 authority → 仍拒。回退不是放行。
+        assert_eq!(
+            host_layer_status("http://evil.example.com/mcp", None).await,
+            StatusCode::FORBIDDEN,
+            "URI authority 回退把外域也放行了"
+        );
+
+        // 既无 Host 头也无 URI authority → 拒（既有行为）。
+        assert_eq!(
+            host_layer_status("/mcp", None).await,
+            StatusCode::FORBIDDEN,
+            "两个来源都没有 authority 时应当拒绝"
+        );
+
+        // Host 头存在时它优先（既有行为，阴性对照：回退不得夺走 Host 头的判定权）。
+        assert_eq!(
+            host_layer_status("http://127.0.0.1:51234/mcp", Some("evil.example.com")).await,
+            StatusCode::FORBIDDEN,
+            "URI authority 合法就放行了一个外域 Host 头"
+        );
+        assert_eq!(
+            host_layer_status("/mcp", Some("127.0.0.1:51234")).await,
+            StatusCode::OK,
+        );
+    }
+
+    /// 把一个请求过一遍**只挂 `require_local_host`** 的路由，返回状态码。
+    async fn host_layer_status(uri: &str, host_header: Option<&str>) -> StatusCode {
+        use tower::ServiceExt;
+
+        let mut builder = axum::http::Request::builder().method("POST").uri(uri);
+        if let Some(host) = host_header {
+            builder = builder.header(header::HOST, host);
+        }
+        let request = builder
+            .body(axum::body::Body::empty())
+            .expect("valid test request");
+
+        let router = axum::Router::new()
+            .route("/mcp", axum::routing::post(|| async { "sentinel" }))
+            .layer(axum::middleware::from_fn(require_local_host));
+
+        router
+            .oneshot(request)
+            .await
+            .expect("router is infallible")
+            .status()
     }
 
     #[test]
