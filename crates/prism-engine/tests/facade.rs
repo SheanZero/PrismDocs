@@ -351,15 +351,32 @@ async fn call_list_feedback(addr: &SocketAddr, project_id: &str) -> String {
 /// 01-06 用假实现证明了"注入通路通"。本测试补的是最后一段：装进 `Arc<dyn …>` 的
 /// 那个具体类型换成真的 `Engine` 之后，链路依然成立。
 ///
-/// ## 这条测试的判别性从哪来
+/// ## 这条测试的判别性从哪来（01-17 后已重排，见下）
 ///
 /// Phase 1 的 `list_feedback` 对合法 project 返回空 vec（comments 表属于 Phase 5），
 /// 而**空结果与"handler 根本没调注入的 trait"是不可区分的**——断言"响应里有 []"
 /// 对一个完全忽略注入的实现同样成立。
 ///
-/// 所以判别性落在第二次调用上：空 project_id 时 `Engine` 会返回它**自己写的**
-/// `ServiceError::Invalid`，那段文本只可能来自 engine 侧的实现。返回 `Ok(vec![])`
-/// 的假实现、或不调 trait 的 handler，都产生不出它。
+/// 判别性原本落在第二次调用上：空 project_id 时 `Engine` 会返回它**自己写的**
+/// `ServiceError::Invalid`，那段文本只可能来自 engine 侧的实现。
+///
+/// **01-17（上轮 WR-12）之后这条路不再走得通**：`PrismHandler` 现在自己执行工具
+/// schema 声明的 `projectId` 契约，空串在**到达 trait 之前**就以 invalid-params
+/// 被拒。这不是回退——它正是那个 plan 要的性质（校验必须长在 handler，不能外包给
+/// 被注入的实现兜底）。而 handler 的拒绝集合恰好**覆盖**了 engine 的（两侧都是
+/// `trim().is_empty()`），所以 MCP 线上**不存在**能引出 engine 校验文本的输入了。
+/// 副作用之一是 engine 的内部文本不再外泄给外部 agent（T-01-20 方向的改善）。
+///
+/// 于是判别性拆成两半，各自守一件事：
+///
+/// - **「被擦掉类型的那个对象确实是 Engine」**：对**同一个** `Arc<dyn FeedbackSource>`
+///   （移进 `McpDeps` 之前留的一份 clone）直接调空 project_id，断言 engine 自己写的
+///   校验文本。假实现与 `Ok(vec![])` 都产生不出它。
+/// - **「handler 真的调了注入的 trait」**：由 `prism-mcp/tests/trait_injection.rs`
+///   的 `injected_feedback_source_is_reached` / `empty_source_yields_no_item` 一对守住
+///   ——它们注入一个返回**独有标记条目**的假实现，那条数据只可能来自 trait。
+///   本测试用真 `Engine` 时拿不到这样的标记（Engine 永远返回空 vec），所以那条性质
+///   在这里本就无法独立成立，放在能成立的地方。
 #[tokio::test]
 async fn engine_satisfies_service_traits() {
     let (_dir, store) = store_on_temp_db();
@@ -368,6 +385,8 @@ async fn engine_satisfies_service_traits() {
     // D-09 的注入面：具体类型在这一行被擦掉，prism-mcp 之后只认 trait。
     let feedback: Arc<dyn FeedbackSource> = Arc::clone(&engine) as Arc<dyn FeedbackSource>;
     let comments: Arc<dyn CommentSink> = Arc::clone(&engine) as Arc<dyn CommentSink>;
+    // 留一份**同一对象**的 clone 做判别性探针（下面的 ②）。
+    let probe = Arc::clone(&feedback);
 
     let ct = CancellationToken::new();
     // Phase 6 的真实注入路径建在这个形状上：token 从钥匙串读出后注入，构造可失败。
@@ -384,13 +403,30 @@ async fn engine_satisfies_service_traits() {
         "合法 project 应返回空反馈列表（Ok 而非 Err），实得: {ok_body}"
     );
 
-    // ② 空 project：响应里出现 **engine 自己写的**校验文本。
-    //    这是本测试唯一的判别性断言——见上面的文档注释。
+    // ①' 空 project 现在由 handler 以 invalid-params 拒掉，**不再**触及 engine。
+    //     断言它，是为了让「哪一层拒的」这件事有人看着：若 handler 的校验被删掉，
+    //     这条会红（它会变成 engine 的 -32603 internal_error）。
     let err_body = call_list_feedback(&addr, "").await;
     ct.cancel();
-
     assert!(
-        err_body.contains("project id must not be empty"),
-        "响应里没有出现 Engine 自己的校验文本 —— 注入的具体类型不是真的被调用: {err_body}"
+        err_body.contains("-32602"),
+        "空 project 没有被 handler 以 invalid-params 拒掉: {err_body}"
+    );
+    assert!(
+        !err_body.contains("project id must not be empty"),
+        "engine 的内部校验文本外泄到了 MCP 响应里: {err_body}"
+    );
+
+    // ② 判别性断言：被擦掉类型的那个对象**确实是 Engine**——它带着 engine 自己
+    //    写的校验文本。这一段刻意不经 MCP：那条路已经被 handler 的 schema 校验
+    //    先行截断（见上面的文档注释）。
+    let engine_side = probe
+        .list_feedback("")
+        .expect_err("Engine 自己的空 project_id 校验");
+    assert!(
+        engine_side
+            .to_string()
+            .contains("project id must not be empty"),
+        "注入的 Arc<dyn FeedbackSource> 背后不是 Engine: {engine_side}"
     );
 }

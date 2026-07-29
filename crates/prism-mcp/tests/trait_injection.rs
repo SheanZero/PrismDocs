@@ -7,6 +7,11 @@
 //! `empty_source_yields_no_item` 是它的阴性对照：换一个返回空 vec 的实现，
 //! 同一请求的响应体里那条数据就消失。没有这条对照，一个直接返回硬编码常量、
 //! 根本不调用注入 trait 的 handler 也能让第一个测试通过。
+//!
+//! **判别点是 `MARKER_ID` 的有无，不是 engine 的校验文本**——两条测试都用非空的
+//! `projectId: "proj-1"`，因此 01-17 在 handler 里加的参数校验不会把它们短路掉。
+//! 第三条 `a_leaky_source_is_never_reached_with_an_invalid_project_id` 走的是相反
+//! 方向：违反 schema 的请求**不得**拿到那条数据。
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -92,6 +97,11 @@ async fn post(
 
 /// 完整走一次 MCP 握手，再调一次 `list_feedback` 工具，返回工具响应的原始文本。
 async fn call_list_feedback(addr: &SocketAddr) -> String {
+    call_list_feedback_with(addr, json!({ "projectId": "proj-1" })).await
+}
+
+/// 同上，但 `arguments` 由调用方给定——用来喂违反工具 schema 的形状。
+async fn call_list_feedback_with(addr: &SocketAddr, arguments: serde_json::Value) -> String {
     let client = client();
 
     let init = post(
@@ -148,11 +158,13 @@ async fn call_list_feedback(addr: &SocketAddr) -> String {
             "method": "tools/call",
             "params": {
                 "name": "list_feedback",
-                "arguments": { "projectId": "proj-1" }
+                "arguments": arguments
             }
         }),
     )
     .await;
+    // JSON-RPC 的错误是**带内**的（HTTP 仍是 2xx），因此这条断言不会把
+    // invalid-params 的用例挡在外面——它挡的是传输层失败。
     assert!(
         call.status().is_success(),
         "tools/call failed: {}",
@@ -191,6 +203,53 @@ async fn empty_source_yields_no_item() {
     assert!(
         !body.contains(MARKER_ID),
         "an empty FeedbackSource still produced {MARKER_ID} — the handler is not reading the injected trait: {body}"
+    );
+}
+
+/// handler 自己执行 schema 声明的 `projectId` 契约，**不依赖被注入的实现替它把关**。
+///
+/// `FixedFeedback` 完全忽略 `project_id`，对空串 / 任何值都照样交出数据——它正是
+/// Phase 6 那个「把空 project id 当作『所有项目』」的实现的最小形态。若校验不在
+/// handler 里，这三种违反 schema 的请求就会拿到 `MARKER_ID`，也就是拿到一份它
+/// 没有资格拿到的数据（01-REVIEW-prior.md WR-12）。
+///
+/// 这条测试是「把 engine 的兜底校验拆掉后仍应全绿」那个反证的**常驻版本**：
+/// 判别力落在 handler，不落在被注入的实现。
+#[tokio::test]
+async fn a_leaky_source_is_never_reached_with_an_invalid_project_id() {
+    /// JSON-RPC 2.0 的 Invalid params。
+    const INVALID_PARAMS: &str = "-32602";
+
+    let ct = CancellationToken::new();
+    let (addr, _task) = serve_loopback(deps_returning(vec![marker_item()]), ct.clone())
+        .await
+        .expect("loopback server started");
+
+    let cases = [
+        (json!({}), "arguments 是空对象"),
+        (json!({ "projectId": 42 }), "projectId 不是字符串"),
+        (json!({ "projectId": "   " }), "projectId 是纯空白"),
+    ];
+    for (arguments, label) in cases {
+        let body = call_list_feedback_with(&addr, arguments).await;
+        assert!(
+            !body.contains(MARKER_ID),
+            "{label}: 一个违反 schema 的请求拿到了数据（{MARKER_ID}）—— \
+             校验不在 handler 里，只在被注入的实现里: {body}"
+        );
+        assert!(
+            body.contains(INVALID_PARAMS),
+            "{label}: 错误类别不是 invalid-params（{INVALID_PARAMS}）: {body}"
+        );
+    }
+
+    // 阴性对照：同一个 server、同一条通路，合法 projectId 仍然拿得到数据。
+    // 少了它，一个「一律报 invalid-params」的 handler 也能让上面全绿。
+    let body = call_list_feedback_with(&addr, json!({ "projectId": "proj-1" })).await;
+    ct.cancel();
+    assert!(
+        body.contains(MARKER_ID),
+        "合法 projectId 也被拒了: {body}"
     );
 }
 
