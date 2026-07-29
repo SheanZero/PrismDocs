@@ -48,8 +48,16 @@ impl McpDeps {
         comments: Arc<dyn CommentSink>,
         bearer: impl Into<Arc<str>>,
     ) -> Result<Self, McpError> {
-        let bearer = bearer.into();
-        if bearer.trim().is_empty() {
+        // 归一化与判空必须落在**同一份字节**上：只用 `trim()` 判空、却存原值，
+        // 造出的是一个「构造成功但永远比不中」的门禁。呈递侧的值来自 HTTP 头，
+        // 尾随 OWS 在解析层就被剥掉了，于是配置里那个换行永远没有客户端能呈上——
+        // **每一个**请求都被拒，且拒绝形态与伪造 token 完全相同（一条
+        // `warn!("bearer token mismatch")`，与攻击者不可区分）。失败是静默且
+        // fail-closed 的，诊断成本极高（01-REVIEW.md WR-06）。
+        // 这不是理论路径：Phase 6 由 `prism-engine` 从钥匙串读出 token 注入，
+        // 钥匙串往返、文件回退、`Command` 输出三条都常带尾随换行。
+        let bearer: Arc<str> = Arc::from(bearer.into().trim());
+        if bearer.is_empty() {
             return Err(McpError::EmptyBearer);
         }
         Ok(Self {
@@ -171,6 +179,40 @@ mod tests {
             ok.expose_bearer(),
             fixture_bearer,
             "the constructor altered a perfectly good token"
+        );
+
+        // ⑤ 归一化：判空与存值必须对**同一份字节**达成一致。只用 trim 判空却存原值，
+        //    造出的是一个「构造成功但永远比不中」的门禁——呈递侧的尾随 OWS 已由 HTTP
+        //    头解析层剥掉，配置侧那个换行则永远没人能呈递（01-REVIEW.md WR-06）。
+        //    Phase 6 从钥匙串读 token，钥匙串往返 / 文件回退 / `Command` 输出都常带 `\n`。
+        let padded = McpDeps::new(Arc::new(Empty), Arc::new(Empty), " tok ")
+            .expect("a bearer with surrounding whitespace still carries a token");
+        assert_eq!(
+            padded.expose_bearer(),
+            "tok",
+            "the constructor stored the untrimmed value —— 门禁永远比不中"
+        );
+
+        // 归一化不得改动一个形态正常的 token：64 位十六进制、无外围空白，逐字返回。
+        // （绑定名沿用 middleware.rs 的 `configured`：`scripts/check-secrets.sh` 抓的是
+        //   「名字像密钥的标识符后跟引号串」这个形状，不该为迁就测试局部变量而放宽。）
+        let configured = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let untouched = McpDeps::new(Arc::new(Empty), Arc::new(Empty), configured)
+            .expect("a well-formed hex bearer must construct");
+        assert_eq!(
+            untouched.expose_bearer(),
+            configured,
+            "归一化改动了一个本来就干净的值"
+        );
+
+        let from_keychain = format!("{fixture_bearer}\n");
+        let trailing_newline =
+            McpDeps::new(Arc::new(Empty), Arc::new(Empty), from_keychain.as_str())
+                .expect("a trailing newline must not build an unopenable gate");
+        assert_eq!(
+            trailing_newline.expose_bearer(),
+            fixture_bearer,
+            "尾随换行被原样存下 —— 呈递侧永远带不上它"
         );
     }
 }
