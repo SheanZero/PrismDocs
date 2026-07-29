@@ -56,12 +56,12 @@ deferred:
     addressed_in: "Phase 4"
     evidence: "Phase 4 goal: 「A3：prism-llm 传输层（流式/重试/keyring）先行交付，速读区功能其后，使 4→6 边只依赖『传输层完成』」——Phase 1 只有 base_url 的存储与校验面，没有 chat client，01-09..01-13 各 SUMMARY 与 STATE.md 记录的顺延理由成立"
 human_verification:
-  - test: "`npm run tauri dev` 起应用，确认窗口不是白屏；打开设置页与 dev 冒烟页；跑冒烟页三个验证入口（总线事件往返 / Channel 1000 条有序流 / 中文搜索命中与阴性对照）；打开 WebView 控制台确认无 CSP 违规报告；随后 `npm run tauri build` 出 dmg 并对装出来的 app 重复一遍"
-    expected: "五步全部正常。三个验证入口的读数与 01-09 人工验证时一致（事件计数 1:1、seq 校验通过 · 实收 1000 条、「锚定引擎」命中 >0 且「量子纠缠」= 0）"
-    why_human: "CSP 只在真实 WebView 里生效——jsdom 与 `cargo test` 都看不见它。这是 01-13 Task 1 的 `<human-check>`，按 workflow.human_verify_mode=end-of-phase 顺延至此。**且这一项现在同时承载成功标准 2 的复验**：SC-2 的真实 WebView 确认由用户在 01-09 之后完成，而 01-13 在那之后给 WebView 加了 CSP（`connect-src 'self' ipc: http://ipc.localhost`）。若 IPC 来源在真实 WebView 下被这条策略挡住，所有命令一起失效——SC-2 的端到端证据因环境变更而失效，必须重跑，不能沿用旧读数"
-  - test: "在 `npm run tauri dev` 的终端里把 base_url 设成一个非 loopback 的 `http://` 端点，观察终端"
-    expected: "终端出现 tracing 格式的行，且 `settings.rs` 那条明文 http 告警（`LLM endpoint uses plaintext http to a non-loopback host`）实际打出来"
-    why_human: "`tracing::dispatcher::has_been_set()` 只证明 dispatcher 就位，不证明日志真的到达终端。01-13 Task 3 自述这条端到端确认尚未做——WR-04 点名的三条安全决策日志是否真有落点，取决于它"
+  - test: "七步（01-24 把原五步扩到七步）：① `npm run tauri dev` 起应用，确认窗口不是白屏；② 打开设置页与 dev 冒烟页；③ 跑冒烟页三个验证入口（总线事件往返 / Channel 1000 条有序流 / 中文搜索命中与阴性对照）；④ 打开 WebView 控制台确认无 CSP 违规报告；⑤ 在设置页确认没有 `form-action` 违规（`Refused to send form data …`）；⑥ 在设置页与冒烟页确认没有 `frame-ancestors` 相关违规；⑦ 随后 `npm run tauri build` 出 dmg，对装出来的 app 把 ①–⑥ 重复一遍"
+    expected: "七步全部正常。三个验证入口的读数与 01-09 人工验证时一致（事件计数 1:1、seq 校验通过 · 实收 1000 条、「锚定引擎」命中 >0 且「量子纠缠」= 0）。⑤⑥ 预期不触发：Phase 1 前端不含任何原生 `<form>` 提交，桌面窗口也不会被嵌套"
+    why_human: "CSP 只在真实 WebView 里生效——jsdom 与 `cargo test` 都看不见它。这是 01-13 Task 1 的 `<human-check>`，按 workflow.human_verify_mode=end-of-phase 顺延至此。**且这一项现在同时承载成功标准 2 的复验**：SC-2 的真实 WebView 确认由用户在 01-09 之后完成，而 01-13 在那之后给 WebView 加了 CSP（`connect-src 'self' ipc: http://ipc.localhost`）。若 IPC 来源在真实 WebView 下被这条策略挡住，所有命令一起失效——SC-2 的端到端证据因环境变更而失效，必须重跑，不能沿用旧读数。⑤⑥ 是 01-24 新加的两条指令（`form-action 'none'` / `frame-ancestors 'none'`）：它们同样只在真实 WebView 里被执行，`tauri-security.test.ts` 守的是配置形态而不是运行期行为"
+  - test: "两步（01-21 改写；原「用 RUST_LOG 提档观察」的做法已不可行）：① **默认档位下**（不设 `RUST_LOG`）在设置页填一个 `http://` 开头的非 loopback base url，确认终端出现 `settings.rs` 那条明文 http 告警；② `RUST_LOG=trace npm run tauri dev`，确认终端出现降档 warn、该 warn 正文不含 `RUST_LOG` 的原值、且 `prism_*` 的 trace 仍被放行"
+    expected: "① 出现 tracing 格式的行，且 `LLM endpoint uses plaintext http to a non-loopback host` 实际打出来（这是默认 `info` 档下就有落点的那条）。② 出现降档 warn，其正文以 `the environment-supplied log filter exceeds the project ceiling` 开头、并说明 rmcp target 被 capped at INFO（理由是提档会把整条 MCP 消息正文倒进本地日志 sink）；该 warn 正文里**不含** `trace` 原值；`prism_*` 的 trace 照常输出（证明上限是针对性的而非全局压制）"
+    why_human: "`tracing::dispatcher::has_been_set()` 只证明 dispatcher 就位，不证明日志真的到达终端。01-13 Task 3 自述这条端到端确认尚未做——WR-04 点名的三条安全决策日志是否真有落点，取决于它。步骤在 01-21 之后必须改写：该 plan 给 env 提供的 filter 加了项目天花板，`RUST_LOG` 提档不再能把 `rmcp` 抬上去，因此「提档观察日志」这个原做法既观察不到目标、也不再是 sink 有落点的证据。`rmcp` 是否开始转储 MCP 消息在 Phase 1 无可观测面（MCP server 尚未起），到 Phase 5/6 才有"
 ---
 
 # Phase 1: 基建骨架 Verification Report（re-verification）
@@ -311,17 +311,53 @@ verifier 用第 52 行原样取出的 PATTERN 逐条回放：
 
 两项，均为 01-13 自述的 Outstanding Human Verification，按 `workflow.human_verify_mode: end-of-phase` 顺延至此。
 
+> **步骤已在本轮 gap-closure 中改写（由 01-27 汇总）。** 第 1 项被 01-24 从五步扩到七步（它给两份 CSP 各加了
+> `form-action 'none'` 与 `frame-ancestors 'none'`）；第 2 项被 01-21 整条改写（它给 env 提供的日志 filter 加了
+> 项目天花板，原先「用 `RUST_LOG` 提档观察」的做法从此既观察不到目标、也不再是 sink 有落点的证据）。
+> 本节是这两项步骤的**唯一权威文本**——`WINDOWS.md` 的 id=8 / id=9 两条只做指向，其中 id=8 描述里的
+> 「五步」是记录当时的措辞，实际步数以本节为准（01-24 明确「只扩步骤、不新开一条」）。
+
 #### 1. 真实 WebView 下的 CSP 与 IPC 双通路（同时承载 SC-2 的复验）
 
-**Test:** `npm run tauri dev` 起应用 → 窗口不是白屏 → 打开设置页与 dev 冒烟页 → 跑冒烟页三个验证入口 → 打开 WebView 控制台确认无 CSP 违规报告 → 随后 `npm run tauri build` 出 dmg，对装出来的 app 重复一遍。
-**Expected:** 五步全部正常；三个入口的读数与 01-09 人工验证一致（事件计数 1:1、「seq 校验通过 · 实收 1000 条」、「锚定引擎」命中 >0 且「量子纠缠」= 0）。
+**Test（七步）:**
+
+1. `npm run tauri dev` 起应用 → 窗口不是白屏。
+2. 打开设置页与 dev 冒烟页。
+3. 跑冒烟页三个验证入口（总线事件往返 / Channel 1000 条有序流 / 中文搜索命中与阴性对照）。
+4. 打开 WebView 控制台确认无 CSP 违规报告。
+5. **在设置页确认没有 `form-action` 违规**（形如 `Refused to send form data to '…' because it violates the following Content Security Policy directive: "form-action 'none'"`）。
+6. **在设置页与冒烟页确认没有 `frame-ancestors` 相关违规。**
+7. `npm run tauri build` 出 dmg，对装出来的 app 把 1–6 重复一遍。
+
+**Expected:** 七步全部正常；三个入口的读数与 01-09 人工验证一致（事件计数 1:1、「seq 校验通过 · 实收 1000 条」、「锚定引擎」命中 >0 且「量子纠缠」= 0）。第 5、6 步预期**不触发**：Phase 1 前端不含任何原生 `<form>` 提交，桌面窗口也不会被嵌套。
+
 **Why human:** CSP 只在真实 WebView 里生效，jsdom（`tauri-security.test.ts` 第 17 行自己写明）与 `cargo test`（走 `mock_builder`，无 WebView）都结构性地看不见它。**且这一项现在同时是 SC-2 的复验**——SC-2 的真实 WebView 证据取自 `csp: null` 的环境，而 `connect-src 'self' ipc: http://ipc.localhost` 直接管辖 IPC 来源；若它在真实 WebView 下挡住 IPC，十个命令一起失效。旧读数不得沿用。
+
+**若第 5 步真的红了**（`form-action` 报告出现）：说明某处存在未被识别的原生表单提交，属于 01-24 引入的回归。修法是把该指令放宽到 `'self'` 并同步改 `src/lib/tauri-security.test.ts` 的期望值——那次改动会过一遍评审，正是那条精确相等断言存在的意义。
 
 #### 2. 日志 sink 真的有落点
 
-**Test:** 在 `npm run tauri dev` 的终端里，把 base_url 设成一个非 loopback 的 `http://` 端点，观察终端输出。
-**Expected:** 出现 tracing 格式的行，且 `settings.rs:85-88` 那条 `LLM endpoint uses plaintext http to a non-loopback host` 告警实际打出来。
+**Test（两步）:**
+
+1. **默认档位下**（不设 `RUST_LOG`）：`npm run tauri dev`，在设置页把 base_url 填成一个非 loopback 的 `http://` 端点，观察终端。
+2. **确认天花板生效**：`RUST_LOG=trace npm run tauri dev`，观察终端。
+
+**Expected:**
+
+1. 出现 tracing 格式的行，且 `settings.rs` 那条 `LLM endpoint uses plaintext http to a non-loopback host` 告警实际打出来。这是默认 `info` 档下就有落点的那条，无需任何提档。
+2. 出现降档 warn，正文逐字为：
+
+   ```
+   the environment-supplied log filter exceeds the project ceiling; the `rmcp` target was capped at INFO because raising it dumps whole MCP message bodies into the local log sink
+   ```
+
+   且该 warn 正文里**不含** `RUST_LOG` 的原值（`trace`）；同时 `prism_*` 的 trace 确实被放行——后者是「上限是针对性的而非全局压制」的证据。
+
 **Why human:** `tracing::dispatcher::has_been_set()` 只证明 dispatcher 就位，不证明日志到达终端（EnvFilter 档位、fmt 层的输出目标都可能让它落空）。WR-04 点名的三条安全决策日志是否真有落点，取决于这条端到端确认。
+
+**为什么步骤必须改写：** 01-21 给 env 提供的 filter 加了项目天花板，`RUST_LOG` 再也抬不动 `rmcp`。于是原做法（「用 `RUST_LOG` 提档观察日志」）有两处失效——目标观察不到，且提档本身不再能证明 sink 有落点（提档被降档吃掉时，看不见日志与没有 sink 在终端上同形）。新的第 1 步刻意走**默认档位**，观察的是不需要提档就该出现的那一条；第 2 步把提档本身变成被观察对象。
+
+`rmcp` 是否真的开始转储 MCP 消息在 Phase 1 **无可观测面**（MCP server 尚未起），到 Phase 5/6 才有。Phase 1 收尾只需确认上面三条。
 
 ### Gaps Summary
 
