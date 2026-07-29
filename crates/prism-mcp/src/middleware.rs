@@ -144,10 +144,16 @@ pub async fn require_bearer(
 /// 这里也没有可泄漏的秘密（配置本身就是空的）；真正的泄漏是放行。
 /// 这是 CR-03 纵深的第二层，第一层在 `McpDeps::new`：即便有人绕过构造器造出空配置，
 /// 这里仍拒；即便有人放宽这里，构造器仍拒。两层各有自己的测试。
+/// **本函数内只有这一个空值处理点**，函数体里不存在第二道兜底——
+/// `the_comparison_is_not_a_plain_equality` 的第三条断言看着它。
 ///
 /// 长度不等时也不提前返回：把 presented 折进一个与 expected 等长的缓冲区
 /// （超出部分参与折叠而非被丢弃），再与长度比较结果按位与。
 fn constant_time_eq(expected: &str, presented: &str) -> bool {
+    // 本函数**唯一**的空值处理点。下面没有第二道守卫——删掉这一条，两个空串会一路
+    // 走到底并让长度与内容双双成立，CR-03 的 fail-open 当场复活。
+    // （历史形态里下面还有一个「空 expected 时取零长切片」的分支，它从来进不去，
+    //   却让读者以为空值在下面还被兜了一次；01-REVIEW.md WR-05 记录的正是这个陷阱。）
     if expected.is_empty() {
         return false;
     }
@@ -155,20 +161,15 @@ fn constant_time_eq(expected: &str, presented: &str) -> bool {
     let expected = expected.as_bytes();
     let presented = presented.as_bytes();
 
-    let mut folded = vec![0u8; expected.len().max(1)];
+    // 早退之后 expected 必然非空，因此缓冲区长度恒 ≥ 1，下面的 `% folded.len()` 安全。
+    let mut folded = vec![0u8; expected.len()];
     for (i, byte) in presented.iter().enumerate() {
         let slot = i % folded.len();
         folded[slot] ^= byte;
     }
-    // 空 expected 时 folded 是长度 1 的哨兵，下面的 ct_eq 会与长度断言一起失败。
-    let padded = if expected.is_empty() {
-        &folded[..0]
-    } else {
-        &folded[..]
-    };
 
     let same_len = (expected.len() as u64).ct_eq(&(presented.len() as u64));
-    let same_bytes = expected.ct_eq(padded);
+    let same_bytes = expected.ct_eq(&folded[..]);
     (same_len & same_bytes).into()
 }
 
@@ -242,6 +243,17 @@ mod tests {
         assert!(
             !body.contains("expected == presented"),
             "退回了短路比较 `==`"
+        );
+        // 第三条：空配置的短路守卫仍在函数体内。它是本函数唯一的空值处理点，
+        // 删掉它 CR-03 的 fail-open 当场复活（01-REVIEW.md WR-05 逐行推过一遍）。
+        //
+        // 锚点刻意取**完整语句**而不是裸的 `is_empty`：这里的匹配面同时含代码与
+        // 函数体内的解释性注释，一个也可能出现在注释里的片段会让这条断言在守卫被
+        // 删掉之后仍然绿。本 phase 已有实测教训（`src-tauri/src/lib.rs` 的源码序
+        // 断言撞上注释而假红，方向相反、成因相同）。
+        assert!(
+            body.contains("if expected.is_empty() {"),
+            "空配置的短路守卫被删掉了 —— 比较层的 fail-open 复活了"
         );
     }
 }
