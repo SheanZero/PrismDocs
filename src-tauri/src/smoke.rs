@@ -17,9 +17,16 @@ pub const SMOKE_DEFAULT_TOTAL: u32 = 1000;
 /// 冒烟流的硬上界（T-01G-27）。
 ///
 /// 每条 `Tick` 是一条 IPC 消息，而 `total` 来自 WebView 里的任意脚本——`u32::MAX`
-/// 是 42.9 亿条。取 10_000 而不是贴着 [`SMOKE_DEFAULT_TOTAL`]：冒烟页固定用 1000，
-/// **正常路径必须不被夹紧**，否则「实收 1000 条」这条人工验证判据会失效。
+/// 是 42.9 亿条。取值刻意留在 [`SMOKE_DEFAULT_TOTAL`] 之上一个数量级而不是贴着它：
+/// 冒烟页固定用默认值，**正常路径必须不被夹紧**，否则「实收 1000 条」这条人工
+/// 验证判据会失效。这个大小关系由下面那条编译期断言看住。
 pub const SMOKE_MAX_TOTAL: u32 = 10_000;
+
+/// 上界必须严格高于冒烟页固定使用的默认值。
+///
+/// 写成编译期断言而不是单测：把上界调到 1000 以下是一次编辑就能犯的错，而它的
+/// 后果（人工验证判据静默失效）恰恰是「跑起来看着还挺正常」那一类。
+const _: () = assert!(SMOKE_DEFAULT_TOTAL < SMOKE_MAX_TOTAL);
 
 /// 流事件。序列化形态是跨 IPC 边界的契约，与前端的判别联合一一对应。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -30,7 +37,20 @@ pub enum SmokeEvent {
     Finished { total: u32 },
 }
 
+/// `total` 的**唯一**夹紧点。
+///
+/// [`generate`] 与 [`collect`] 都经这里，上界的数字于是只有一处。夹紧放在本模块
+/// 而不是调用方：本模块是这条流的真相源，且它不依赖 tauri——上界因此不需要真实
+/// Channel 就能被断言。
+fn clamp_total(total: u32) -> u32 {
+    total.min(SMOKE_MAX_TOTAL)
+}
+
 /// 按 `total` 生成一条流：`Started` 首、`total` 条 `Tick`（seq 由 0 递增）、`Finished` 末。
+///
+/// `total` 先经 [`clamp_total`] 夹紧到 [`SMOKE_MAX_TOTAL`]，`Started` / `Finished`
+/// 携带的也是夹紧后的值——流对自己保持自洽，否则前端「实收 N 条 == Started 报的
+/// total」这条校验会在一条完好的流上报失败。
 ///
 /// `sink` 的错误立即中止并原样返回——Channel 已关闭时继续 send 只是白白刷日志。
 /// `total = 0` 是合法输入，产出 `[Started, Finished]` 两条，返回 `Ok`：
@@ -39,6 +59,7 @@ pub fn generate<E>(
     total: u32,
     mut sink: impl FnMut(SmokeEvent) -> Result<(), E>,
 ) -> Result<(), E> {
+    let total = clamp_total(total);
     sink(SmokeEvent::Started { total })?;
     for seq in 0..total {
         sink(SmokeEvent::Tick { seq })?;
@@ -48,7 +69,9 @@ pub fn generate<E>(
 
 /// [`generate`] 的收集形态，供不需要真实 Channel 的断言使用。
 pub fn collect(total: u32) -> Vec<SmokeEvent> {
-    let mut out = Vec::with_capacity(total as usize + 2);
+    // 预分配按同一上界夹紧（T-01G-29）：未校验的 `total` 直接进 `with_capacity`
+    // 意味着一次 `u32::MAX` 的调用先申请十几 GB，而循环连一条都还没产出。
+    let mut out = Vec::with_capacity(clamp_total(total) as usize + 2);
     let Ok(()) = generate::<std::convert::Infallible>(total, |ev| {
         out.push(ev);
         Ok(())
@@ -96,13 +119,14 @@ mod tests {
     ///
     /// 与上一条成对：单看上一条，一个 `total.min(1)` 的实现也能绿——而那会让
     /// 冒烟页的「实收 1000 条」永远读不到 1000，人工验证判据就此失效。
+    /// （大小关系本身由 `SMOKE_MAX_TOTAL` 旁边的编译期断言看住；这里看的是
+    /// 夹紧**没有把默认路径的读数改掉**。）
     #[test]
-    fn the_default_total_stays_below_the_ceiling_and_passes_through() {
-        assert!(
-            SMOKE_DEFAULT_TOTAL < SMOKE_MAX_TOTAL,
-            "上界压到了冒烟页固定值之下：{SMOKE_DEFAULT_TOTAL} >= {SMOKE_MAX_TOTAL}"
+    fn the_default_total_passes_through_unclamped() {
+        assert_eq!(
+            tick_count(&collect(SMOKE_DEFAULT_TOTAL)),
+            SMOKE_DEFAULT_TOTAL
         );
-        assert_eq!(tick_count(&collect(SMOKE_DEFAULT_TOTAL)), SMOKE_DEFAULT_TOTAL);
     }
 
     /// 有序性断言的形态是**序列比较**，不是集合比较。

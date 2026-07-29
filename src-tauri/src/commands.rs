@@ -128,12 +128,21 @@ pub async fn dev_seed_sample_docs(state: State<'_, AppState>) -> Result<String, 
 /// Channel 由**前端**创建并作为命令参数传入，因此这条通路只适合**请求作用域**的流；
 /// 引擎主动推送没有常驻 channel，那正是 FS 驱动流程必须走事件通路
 /// （[`crate::bus_adapter`]）的原因。
+///
+/// `total` 是不可信输入（WebView 里的任意脚本都够得着这条命令），上界由
+/// [`smoke::SMOKE_MAX_TOTAL`] 在 [`smoke::generate`] 内部夹紧——T-01G-27。
+/// 循环本身经 `spawn_blocking` 落到阻塞线程池：`Channel::send` 是**同步**的，
+/// 这个循环一次都不让出，留在 async 上下文里就是本模块开头第 47-51 行说的
+/// 「卡住整个 IPC 线程」——T-01G-28。
 #[tauri::command]
 pub async fn dev_smoke_stream(
     on_event: tauri::ipc::Channel<SmokeEvent>,
     total: u32,
 ) -> Result<(), String> {
-    smoke::generate(total, |ev| on_event.send(ev)).map_err(|_| ERR_CHANNEL.to_string())
+    tauri::async_runtime::spawn_blocking(move || smoke::generate(total, |ev| on_event.send(ev)))
+        .await
+        .map_err(|_| ERR_TASK.to_string())?
+        .map_err(|_| ERR_CHANNEL.to_string())
 }
 
 #[cfg(test)]
