@@ -167,6 +167,34 @@ mod tests {
         }
     }
 
+    /// `dev_smoke_stream` 必须把整个循环交给阻塞线程池（T-01G-28）。
+    ///
+    /// 源码断言而非行为断言：`Channel::send` 是同步的，一个直接在 async 命令体里
+    /// 跑完 `0..total` 的实现不会有哪次调用失败——能观测到的只有它把循环放在哪一层。
+    /// （行为侧的 `Handle::try_current()` 探针取决于 `tauri::async_runtime` 当前
+    /// 选的后端，那是实现细节，不适合当契约。）
+    #[test]
+    fn dev_smoke_stream_hands_the_loop_to_the_blocking_pool() {
+        let source = production_source();
+        let body = source
+            .split_once("pub async fn dev_smoke_stream")
+            .expect("找不到 dev_smoke_stream")
+            .1
+            // 后面若再有别的 item，切在它的属性行上，别把邻居的实现算进来。
+            .split("\n#[")
+            .next()
+            .unwrap_or_default()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        assert!(
+            body.contains("tauri::async_runtime::spawn_blocking(move || smoke::generate("),
+            "dev_smoke_stream 没有把 smoke::generate 交给 spawn_blocking —— \
+             这个循环会跑在 IPC executor 上: {body}"
+        );
+    }
+
     /// 错误串必须经 `map_err` 收敛（T-01-11）。
     ///
     /// `e.to_string()` 是内部错误原文透传前端的典型写法；它一旦出现在本文件里，

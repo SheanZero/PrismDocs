@@ -14,6 +14,13 @@ use serde::Serialize;
 /// 的流即使实现是乱序的也大概率看起来是对的——那种绿证明不了任何事。
 pub const SMOKE_DEFAULT_TOTAL: u32 = 1000;
 
+/// 冒烟流的硬上界（T-01G-27）。
+///
+/// 每条 `Tick` 是一条 IPC 消息，而 `total` 来自 WebView 里的任意脚本——`u32::MAX`
+/// 是 42.9 亿条。取 10_000 而不是贴着 [`SMOKE_DEFAULT_TOTAL`]：冒烟页固定用 1000，
+/// **正常路径必须不被夹紧**，否则「实收 1000 条」这条人工验证判据会失效。
+pub const SMOKE_MAX_TOTAL: u32 = 10_000;
+
 /// 流事件。序列化形态是跨 IPC 边界的契约，与前端的判别联合一一对应。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
@@ -51,7 +58,52 @@ pub fn collect(total: u32) -> Vec<SmokeEvent> {
 
 #[cfg(test)]
 mod tests {
-    use super::{collect, generate, SmokeEvent, SMOKE_DEFAULT_TOTAL};
+    use super::{collect, generate, SmokeEvent, SMOKE_DEFAULT_TOTAL, SMOKE_MAX_TOTAL};
+
+    fn tick_count(events: &[SmokeEvent]) -> u32 {
+        events
+            .iter()
+            .filter(|ev| matches!(ev, SmokeEvent::Tick { .. }))
+            .count() as u32
+    }
+
+    /// 上界必须真的把输入夹住（T-01G-27）。
+    ///
+    /// 用 `SMOKE_MAX_TOTAL + 1` 而不是 `u32::MAX`：前者足以证伪「没有夹紧」，
+    /// 后者要跑 42.9 亿次循环才能给出同一个结论。
+    #[test]
+    fn smoke_stream_clamps_a_total_above_the_ceiling() {
+        let events = collect(SMOKE_MAX_TOTAL + 1);
+
+        assert_eq!(tick_count(&events), SMOKE_MAX_TOTAL);
+        // 首末事件报出的也必须是夹紧后的值。否则流对自己不自洽：前端的
+        // 「实收 N 条 == Started 报的 total」校验会在一条完好的流上报失败。
+        assert_eq!(
+            events.first(),
+            Some(&SmokeEvent::Started {
+                total: SMOKE_MAX_TOTAL
+            })
+        );
+        assert_eq!(
+            events.last(),
+            Some(&SmokeEvent::Finished {
+                total: SMOKE_MAX_TOTAL
+            })
+        );
+    }
+
+    /// 冒烟页固定使用的 1000 条路径**不**被夹紧。
+    ///
+    /// 与上一条成对：单看上一条，一个 `total.min(1)` 的实现也能绿——而那会让
+    /// 冒烟页的「实收 1000 条」永远读不到 1000，人工验证判据就此失效。
+    #[test]
+    fn the_default_total_stays_below_the_ceiling_and_passes_through() {
+        assert!(
+            SMOKE_DEFAULT_TOTAL < SMOKE_MAX_TOTAL,
+            "上界压到了冒烟页固定值之下：{SMOKE_DEFAULT_TOTAL} >= {SMOKE_MAX_TOTAL}"
+        );
+        assert_eq!(tick_count(&collect(SMOKE_DEFAULT_TOTAL)), SMOKE_DEFAULT_TOTAL);
+    }
 
     /// 有序性断言的形态是**序列比较**，不是集合比较。
     ///
