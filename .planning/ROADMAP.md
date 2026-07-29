@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. SQLite schema v1 落地：WAL + 单写者 + r2d2 读池（query_only=ON）并发读写正常；FTS5 中文查询返回非零结果（CJK tokenizer 在 schema v1 定案）；rusqlite_migration 迁移体系可用，bundled SQLite ≥3.51.3
   4. API key 经 keyring-core + apple-native-keyring-store 写入系统钥匙串并可读回，prism-llm 为唯一网络出口与唯一密钥入口，代码与配置中无明文密钥
 
-**Plans**: 15/28 plans executed
+**Plans**: 16/28 plans executed
 
 Plans:
 **Wave 1**
@@ -90,7 +90,7 @@ Plans:
 **Gap-closure Wave 4** *(blocked on 01-14 —— 全部计划的验收都要求 `check-secrets.sh all` 退出 0)*
 
 - [x] 01-15-PLAN.md — 依赖方向断言不再吞掉 `cargo tree` 失败 + crate 名锚定（本轮 WR-04 ≡ 上轮 WR-11、本轮 IN-04a）
-- [ ] 01-16-PLAN.md — prism-mcp 门禁比较层去死代码、bearer 构造期归一化、scheme 大小写不敏感（本轮 WR-05/06/07 ≡ 上轮 WR-15）
+- [x] 01-16-PLAN.md — prism-mcp 门禁比较层去死代码、bearer 构造期归一化、scheme 大小写不敏感（本轮 WR-05/06/07 ≡ 上轮 WR-15）
 - [ ] 01-18-PLAN.md — prism-store 打开与收尾的三处静默降级（上轮 WR-02 / WR-03 / IN-03）
 - [ ] 01-20-PLAN.md — agent 回执 status 入日志的取值约束 + 移除死变体（上轮 WR-13 / IN-05）
 - [ ] 01-21-PLAN.md — 日志面上限（`RUST_LOG` 封顶）、tracing 测试串行化、dev 命令移出 release IPC 面（本轮 WR-10 / IN-02、上轮 WR-07 / IN-01）
@@ -261,7 +261,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 ∥ 5 → 6 → 7 → 8（�
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 基建骨架 | 15/28 | In Progress|  |
+| 1. 基建骨架 | 16/28 | In Progress|  |
 | 2. F1 导入与同步 | 0/TBD | Not started | - |
 | 3. 锚定引擎 ★ | 0/TBD | Not started | - |
 | 4. F2′ 速读区 | 0/TBD | Not started | - |
