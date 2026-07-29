@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. SQLite schema v1 落地：WAL + 单写者 + r2d2 读池（query_only=ON）并发读写正常；FTS5 中文查询返回非零结果（CJK tokenizer 在 schema v1 定案）；rusqlite_migration 迁移体系可用，bundled SQLite ≥3.51.3
   4. API key 经 keyring-core + apple-native-keyring-store 写入系统钥匙串并可读回，prism-llm 为唯一网络出口与唯一密钥入口，代码与配置中无明文密钥
 
-**Plans**: 25/28 plans executed
+**Plans**: 26/28 plans executed
 
 Plans:
 **Wave 1**
@@ -106,7 +106,7 @@ Plans:
 
 **Gap-closure Wave 6** *(blocked on 前端计划 —— lint 首跑需要 `src/` 已稳定)*
 
-- [ ] 01-26-PLAN.md — 前端 linter 落地（ESLint flat config + `npm run lint`），含包合法性 blocking-human 闸门（上轮 WR-16 后半）
+- [x] 01-26-PLAN.md — 前端 linter 落地（ESLint flat config + `npm run lint`），含包合法性 blocking-human 闸门（上轮 WR-16 后半）
 
 **Gap-closure Wave 7** *(blocked on 全部代码计划 —— clippy 扩面要求受检 crate 已修好)*
 
@@ -261,7 +261,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 ∥ 5 → 6 → 7 → 8（�
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 基建骨架 | 25/28 | In Progress|  |
+| 1. 基建骨架 | 26/28 | In Progress|  |
 | 2. F1 导入与同步 | 0/TBD | Not started | - |
 | 3. 锚定引擎 ★ | 0/TBD | Not started | - |
 | 4. F2′ 速读区 | 0/TBD | Not started | - |

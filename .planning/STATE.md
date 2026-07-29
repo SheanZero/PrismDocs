@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-19-PLAN.md
-last_updated: "2026-07-29T14:13:36.504Z"
+stopped_at: Completed 01-26-PLAN.md
+last_updated: "2026-07-29T23:20:28.182Z"
 last_activity: 2026-07-29
 last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 25
+  completed_plans: 26
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 25 of 28（01-01..01-16 已执行；下一份 01-17）
+Plan: 26 of 28（01-01..01-16 已执行；下一份 01-17）
 Status: Ready to execute
 Last activity: 2026-07-29 — 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 93%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -91,6 +91,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P25 | 20min | 2 tasks | 2 files |
 | Phase 01 P17 | ~55min | 3 tasks | 5 files |
 | Phase 01 P19 | 8m | 3 tasks | 3 files |
+| Phase 01 P26 | 18min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -194,6 +195,10 @@ Recent decisions affecting current work:
 - [Phase ?]: 测试名/注释/断言必须对同一条真实存在的性质一致：reader_snapshot_is_isolated 改名 writer_commits_while_a_reader_holds_a_pooled_connection，恒真断言换成 assert_eq!(after, 2)
 - [Phase ?]: SC-3 的 SQLite 下界只有 open.rs::MIN_SQLITE 一个来源；lib.rs 与 concurrency.rs 两条测试都引用它，不再各写一份字面量
 - [Phase ?]: insert_samples 走路径 A（累加 stmt.execute 的受影响行数）而非改签名，调用点 Engine::seed_sample_docs 因此未动
+- [Phase ?]: 不 extends react-hooks 的 recommended-latest：它把 exhaustive-deps 配成 warn 而 eslint 对 warn 退出 0，判别力归零
+- [Phase ?]: 不引入 @eslint/js：eslint 10 已不再装它，引入等于加一个未审计的直接依赖
+- [Phase ?]: 测试文件三条规则豁免均有实测依据；no-unnecessary-type-assertion 的 autofix 与 tsc 直接矛盾（TS2339）
+- [Phase ?]: eslint-plugin-react-hooks 选 7.x：人工明确拒绝更轻的 6.x，接受 babel/hermes/zod 传递依赖为已知成本
 
 ### Pending Todos
 
@@ -228,6 +233,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T14:13:28.762Z
-Stopped at: Completed 01-19-PLAN.md
+Last session: 2026-07-29T23:20:28.172Z
+Stopped at: Completed 01-26-PLAN.md
 Resume file: None
