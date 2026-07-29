@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-06-PLAN.md
-last_updated: "2026-07-28T23:59:29.197Z"
+stopped_at: Completed 01-07-PLAN.md
+last_updated: "2026-07-29T00:24:14.175Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 9
-  completed_plans: 5
+  completed_plans: 7
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 7 of 9
+Plan: 8 of 9
 Status: Ready to execute
 Last activity: 2026-07-28 — Phase 01 execution started
 
-Progress: [██████░░░░] 56%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [██████░░░░] 56%
 | Phase 01 P04 | 7min | 2 tasks | 11 files |
 | Phase 01 P05 | 38min | 2 tasks | 7 files |
 | Phase 01 P06 | 26min | 2 tasks | 10 files |
+| Phase 01 P07 | 31min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,10 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-06: prism-mcp 的 bearer 在 McpDeps 中为私有字段 + pub(crate) expose_bearer，不是 pub 字段——token 的取用点在代码搜索中唯一可见
 - [Phase ?]: 01-06: 三层门禁一律返回 403 + 空正文（不给 bearer 缺失单开 401）——状态码差异本身就是逐层试探的信息源（T-01-29）
 - [Phase ?]: 01-06: rmcp SDK 侧 allowed_hosts/allowed_origins 与应用层中间件配成同一份做防御纵深；代价是端到端摘层反证失效，改由 sentinel-router 隔离测试承担
+- [Phase ?]: 01-07: check-deps.sh 的 single-egress 拆两条——叶子 crate 整树断言不变，prism-engine 改为「直接依赖里没有 + cargo tree --invert 反向闭包里除 prism-llm 外无 prism-*」。原断言与「密钥唯一经 prism-llm 转交」互斥（src-tauri 只依赖 prism-engine，shell 通往钥匙串必经 facade）
+- [Phase ?]: 01-07: 端到端注入测试的判别性不能落在「响应里有空集」上——Phase 1 的 list_feedback 返回空 vec，空结果与「handler 根本没调注入 trait」不可区分；改落在 engine 自己写的校验文本上（并实测确认 rmcp 对该参数无兜底校验）
+- [Phase ?]: 01-07: 等事件的测试一律包 timeout，且前置条件断言要移出判别性测试——前者防「反证挂住而非变红」，后者防「反证落在前置条件上而非被守的那条断言上」
+- [Phase ?]: 01-07: facade 方法一律同步（spawn_blocking 归调用方）：改成 async fn 会废掉 std::sync::MutexGuard !Send 对「跨 await 持写锁」的编译期保护
 
 ### Pending Todos
 
@@ -122,6 +127,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T23:59:29.191Z
-Stopped at: Completed 01-06-PLAN.md
+Last session: 2026-07-29T00:24:14.168Z
+Stopped at: Completed 01-07-PLAN.md
 Resume file: None
