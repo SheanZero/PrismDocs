@@ -22,7 +22,16 @@ use tauri::test::{mock_builder, MockRuntime, INVOKE_KEY};
 use tauri::webview::InvokeRequest;
 use tauri::{App, Manager, WebviewWindow, WebviewWindowBuilder};
 
-/// 命令面的全集。`generate_handler!` 里注册了几个，这里就必须列几个。
+/// 命令面的全集——**debug 形态的那一份**。
+///
+/// `run()` 里的 `generate_handler!` 按 `debug_assertions` 分叉（release 那一支不含四条
+/// `dev_*`），但本文件不经 `run()`：下面的 `mock_app()` 自建 handler 列表，两种构建形态下
+/// 都是同一份。`cargo test` 跑的永远是 debug，所以这里列的就是 debug 那一支的十条；
+/// release 那一支由 `lib.rs` 的 `the_release_ipc_surface_excludes_the_dev_commands`
+/// 源码断言看住（行为面测不出来）。
+///
+/// 数量刻意不写进散文——上一轮评审逮到过三处注释数词与数组长度不符（IN-01）。
+/// 长度由 `[&str; N]` 自己声明，散文只说是什么。
 const COMMANDS: [&str; 10] = [
     "dev_ping",
     "search_documents",
@@ -122,7 +131,7 @@ fn smoke_stream_command_is_registered_and_returns_ok() {
     assert!(res.is_ok(), "dev_smoke_stream 未返回 Ok: {res:?}");
 }
 
-/// 不需要钥匙串的六个命令：本测试进程里它们必须**返回 Ok**。
+/// 不需要钥匙串的那些命令：本测试进程里它们必须**返回 Ok**。
 ///
 /// 断言 Ok 而不是「错误不像未注册」，是因为后者对「命令注册了但委托写错了」不敏感。
 const COMMANDS_EXPECTED_OK: [&str; 7] = [
@@ -135,17 +144,17 @@ const COMMANDS_EXPECTED_OK: [&str; 7] = [
     "dev_seed_sample_docs",
 ];
 
-/// 需要钥匙串的两个命令。
+/// 需要钥匙串的那些命令。
 ///
 /// 本测试进程**从不调用** `init_secrets`，所以 `keyring_core` 没有默认后端，
 /// 这两条会在触碰真实登录钥匙串之前就失败——测试因此不会弹授权框、CI 也不会挂。
 const COMMANDS_NEEDING_KEYCHAIN: [&str; 3] =
     ["set_api_key", "api_key_status", "delete_api_key"];
 
-/// 八个命令全部可经 IPC 到达，且错误串已被映射收敛。
+/// [`COMMANDS`] 里的命令全部可经 IPC 到达，且错误串已被映射收敛。
 ///
 /// **负对照是这个测试的判别性所在**：先用一个不存在的命令名确认「未注册」确实有
-/// 可观测的错误形态（`Command X not found`），再断言八个真命令都不是那个形态。
+/// 可观测的错误形态（`Command X not found`），再断言每个真命令都不是那个形态。
 /// 没有负对照的话，「错误串里没有 not found」在 marker 写错时也恒真——
 /// 而这正是本测试第一版实际踩到的：来源 URL 写成 Windows 形态时每个命令都被 ACL
 /// 拒成 `not allowed. Plugin not found`，与「未注册」肉眼难分。

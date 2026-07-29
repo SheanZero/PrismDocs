@@ -167,7 +167,7 @@ pub fn run() {
     // 与「钥匙串后端注册失败不阻断启动」同一口径。
     let _ = init_tracing();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .setup(|app| {
             use tauri::Manager;
 
@@ -183,19 +183,46 @@ pub fn run() {
             bus_adapter::spawn(app.handle().clone(), state.engine.subscribe());
             app.manage(state);
             Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            commands::dev_ping,
-            commands::search_documents,
-            commands::set_api_key,
-            commands::api_key_status,
-            commands::delete_api_key,
-            commands::get_setting,
-            commands::set_base_url,
-            commands::dev_emit_bus_event,
-            commands::dev_smoke_stream,
-            commands::dev_seed_sample_docs,
-        ])
+        });
+
+    // 命令面按构建形态分叉，**编译期**而不是运行期。
+    //
+    // 前端门控管不了这件事：`App.tsx` 的 `import.meta.env.DEV` 摇掉的是 dev **路由按钮**，
+    // 不是 dev **命令**。任何在 WebView 里执行的脚本——Phase 3+ 起要渲染外部 agent 写的
+    // Markdown，CSP 是第一道，命令面最小化是第二道——都能直接
+    // `invoke("dev_seed_sample_docs")`，往用户真实的
+    // `~/Library/Application Support/PrismDocs/prismdocs.db` 里写三份 fixture 文档；
+    // 那些行的 project id 是硬编码的 `smoke-project`（`prism_store::seed`），
+    // 与真实导入在 schema 层不可区分，Phase 2 时还在那里（T-01G-23）。
+    // 另一条 `dev_emit_bus_event` 可被刷成 UI 失效风暴（T-01G-24）。
+    //
+    // 不用运行期 `if`：那意味着命令**仍在二进制里**、仍在 ACL 之外的路径上可触及，
+    // 而这里要的是「不存在」。
+    #[cfg(debug_assertions)]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        commands::dev_ping,
+        commands::search_documents,
+        commands::set_api_key,
+        commands::api_key_status,
+        commands::delete_api_key,
+        commands::get_setting,
+        commands::set_base_url,
+        commands::dev_emit_bus_event,
+        commands::dev_smoke_stream,
+        commands::dev_seed_sample_docs,
+    ]);
+
+    #[cfg(not(debug_assertions))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        commands::search_documents,
+        commands::set_api_key,
+        commands::api_key_status,
+        commands::delete_api_key,
+        commands::get_setting,
+        commands::set_base_url,
+    ]);
+
+    builder
         .run(tauri::generate_context!())
         .expect("failed to start the PrismDocs shell");
 }
@@ -477,5 +504,62 @@ mod tests {
             "init_tracing() runs after tauri::Builder — AppState::bootstrap() failures and \
              the keychain-unavailable degradation notice would both be lost"
         );
+    }
+
+    /// 发布形态的 IPC 面里不含四条 `dev_*` 命令。
+    ///
+    /// 为什么是源码断言：`cargo test` 跑的永远是 debug，两份命令列表里被编译进
+    /// 测试二进制的只有 debug 那一份——release 那一份的内容在行为面上**测不出来**。
+    /// 与 `run_installs_tracing_before_it_builds_the_app` 同一形态、同一理由。
+    ///
+    /// 锚点取**完整语句片段**而不是裸名字：`dev_seed_sample_docs` 这个裸名字在
+    /// 分叉上方那段解释性注释里也出现，而源码序断言的匹配面里同时含代码与注释
+    /// （本 phase 已实测过这会让断言假红）。切片同样必须收在该语句的 `]);` 上，
+    /// 否则会一路吃到文件尾，把 debug 那一支和本测试自己的字符串字面量都算进来。
+    ///
+    /// 起点锚点跨行，于是它在本文件源码里只有一处能命中——本测试自己那份是**转义后的**
+    /// 字面量（`\n` 是两个字符），与 `run()` 里真正的换行不同形。写本测试时实测过：
+    /// 锚点只写单行的 `#[cfg(not(...))]` 时，`find` 会先命中本测试自己的字面量，
+    /// 于是在实现根本没写分叉时也能走过 `expect`——判别力全靠下面那条负对照捞回来。
+    #[test]
+    fn the_release_ipc_surface_excludes_the_dev_commands() {
+        const RELEASE_ARM_ANCHOR: &str =
+            "#[cfg(not(debug_assertions))]\n    let builder = builder.invoke_handler(";
+
+        let source = include_str!("lib.rs");
+        let run_at = source
+            .find("pub fn run()")
+            .expect("lib.rs should declare pub fn run()");
+        let body = &source[run_at..];
+
+        let arm_at = body
+            .find(RELEASE_ARM_ANCHOR)
+            .expect("run() should register a release-only handler list");
+        let arm = &body[arm_at..];
+        let arm_end = arm
+            .find("]);")
+            .expect("the release arm should close a generate_handler! list");
+        let arm = &arm[..arm_end];
+
+        for dev in [
+            "commands::dev_ping,",
+            "commands::dev_emit_bus_event,",
+            "commands::dev_smoke_stream,",
+            "commands::dev_seed_sample_docs,",
+        ] {
+            assert!(
+                !arm.contains(dev),
+                "release 的 IPC 面上仍注册着 {dev} —— WebView 里任何脚本都能 invoke 它"
+            );
+        }
+
+        // 非恒真的另一半：切出来的这一段确实是一份命令列表，而不是被切空的片段。
+        // 少了这两条，把整个分叉删掉也能让上面的循环全绿。
+        for production in ["commands::search_documents,", "commands::set_api_key,"] {
+            assert!(
+                !arm.is_empty() && arm.contains(production),
+                "release 的命令列表里没有生产命令 {production} —— 切片锚点已失效"
+            );
+        }
     }
 }
