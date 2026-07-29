@@ -36,18 +36,37 @@ jobs:
       - name: Plaintext secret scan (pattern selftest + repo scan)
         run: bash scripts/check-secrets.sh all
 
-      - name: Clippy (engine selection set)
-        run: cargo clippy -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine -- -D warnings
+      # `prism-cli` 与八个 engine crate 并进同一次调用：三者的 feature 面相同，
+      # 且它按 D-10 与 D-01 一样是 tauri-free 的。Tauri 壳的 clippy 不能并进来——
+      # 它必须带 `--features test`，因此落在 shell job（理由见那边的注释）。
+      - name: Clippy (engine selection set + CLI helper)
+        run: cargo clippy -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine -p prism-cli -- -D warnings
 
-      - name: Test (engine selection set)
-        run: cargo test -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine
+      # `prism-cli` 进这一步是为了让它成为一条**声明的**闸门。此前它的测试只作为
+      # `cargo llvm-cov --workspace` 的副作用被跑到——那是一条偶然的闸门，而下面那步
+      # 一收窄范围它就彻底没人跑了。
+      - name: Test (engine selection set + CLI helper)
+        run: cargo test -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine -p prism-cli
 
       - uses: taiki-e/install-action@cargo-llvm-cov
 
       # Phase 1 只测量与呈报，不设 --fail-under —— 理由与 Phase 2 的交接见 01-02-SUMMARY.md
+      #
+      # 范围 = 八个 engine crate，与本步骤的标题、与上面 clippy/test 的「engine 选择集」
+      # 以及 `just test-engine` 是同一个集合。改动前是 `--workspace`：它把 Tauri 壳一并
+      # 测量却**不带** `--features test`，于是 tests/ipc.rs 因 feature gate 编译成零个测试，
+      # 而得到的数字以 `### Engine coverage` 之名发布——Phase 2 要开的硬闸门，基线不能是
+      # 一个和它的标签不同范围的读数。`prism-cli` 刻意不进这个范围：按 D-10 它不是 engine
+      # crate（依赖树里不许出现任何 prism-*），它的测试由上面那条声明的 cargo test 看住。
+      #
+      # `clean --workspace` 不是保险动作，是范围断言的一部分。`./target` 进了缓存，里面
+      # 可能留着上一次运行（或上一个范围）的 llvm-cov 对象，而 `report` 汇总的是它在目录里
+      # 找到的全部对象，不是本次 `--no-report` 点名的那些。本机实测：不 clean 时收窄后的
+      # 报告里 src-tauri/src/* 仍然以 0.00% 出现并计入 TOTAL——范围与标题当场又不一致了。
       - name: Coverage (engine)
         run: |
-          cargo llvm-cov --no-report --workspace
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov --no-report -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine
           cargo llvm-cov report --summary-only | tee coverage-summary.txt
           cargo llvm-cov report --lcov --output-path lcov.info
           {
@@ -71,6 +90,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - uses: actions/cache@v4
         with:
@@ -80,6 +101,15 @@ jobs:
             ./target
           key: ${{ runner.os }}-cargo-shell-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-shell-
+
+      # 壳的 clippy 落在这个 job 而不是 engine job：两个 flag 都是承载性的，而它们只在
+      # 这里成立。`--all-targets` 与 `--features test` 缺任何一个，tests/ipc.rs 都不进
+      # clippy 的受检面（本机实测：往该文件插一处 needless_return，四种组合中只有
+      # `--all-targets --features test` 退出非零，另外三种照常退出 0）。
+      # 放进 engine job 会让那个 job 也编译 Tauri 壳的 test feature 面，与它自己的缓存
+      # 分段（`-cargo-engine-`）以及「两个 job 编译不同 feature 集」这个前提直接矛盾。
+      - name: Clippy (Tauri shell, feature-gated IPC tests included)
+        run: cargo clippy -p prismdocs-shell --all-targets --features test -- -D warnings
 
       - name: Test (Tauri shell, feature-gated IPC tests included)
         run: cargo test -p prismdocs-shell --features test
