@@ -5,6 +5,23 @@ name: CI
 
 on: [push, pull_request]
 
+# 最小权限。三个 job 只读代码：跑脚本、编译、测试、上传 artifact。
+# `actions/upload-artifact@v4` 不经 `GITHUB_TOKEN` 上传（走 Actions 运行时的 artifact
+# 服务，凭 `ACTIONS_RUNTIME_TOKEN`），因此 `contents: read` 之外不需要任何额外权限。
+# 将来若加了要写回仓库的步骤（评论 PR、推 tag、发 release），在**那个 job 上**单独提权，
+# 不要放宽这里——顶层放宽会把权限一并交给编译第三方 crate 的那两个 job。
+permissions:
+  contents: read
+
+# 同仓库分支推送 + 由它开的 PR 会各触发一次，两次跑的是同一个 commit。
+# group 里用 `head_ref || ref_name` 而不是 `github.ref`：pull_request 事件的
+# `github.ref` 是 `refs/pull/N/merge`、push 是 `refs/heads/X`，两者永不相等，
+# 拿它分组等于一个组都没合并、双跑照旧。`head_ref`（PR 事件 = 源分支名）与
+# `ref_name`（push = 分支名）在同一分支上取值相同，才真的落进同一个组。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   # 依赖方向断言 + 密钥卫生 + engine 选择集的 lint/test/coverage。
   engine:
@@ -19,14 +36,20 @@ jobs:
 
       # 单一 workspace 下产物落在仓库根 target/；缓存指向 shell 子目录下的构建目录
       # 会 miss（它已不存在），后果是每次全量重编。
+      #
+      # key 与 restore-keys 都带 `engine` 段。改动前 engine 的 restore-keys
+      # （`<os>-cargo-`）是 shell job key（`<os>-cargo-shell-…`）的**前缀**，于是
+      # engine job 能恢复 shell 的 target/。两个 job 编译的 feature 集不同（这边不带
+      # `prismdocs-shell/test`，那边带），互相恢复今天无害，但会在 feature 差异变大时
+      # 制造只在 CI 上出现、本机复现不出的构建差异。现在两段互不为前缀。
       - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             ./target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-cargo-engine-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-engine-
 
       - name: Dependency-direction assertions
         run: bash scripts/check-deps.sh all
@@ -126,6 +149,16 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # 排在测试之前，理由与 `check-secrets.sh all` 把 selftest 排在 scan 之前同源：
+      # 先红的应当是更早、更便宜的那一层。
+      #
+      # 这一步不与下面的 `npm run build`（内含 `tsc --noEmit`）重复：eslint.config.js
+      # 刻意只取 tsc 结构性看不见的那一类规则。本机实测——往 src/App.tsx 插一处
+      # `console.log`，`npm run lint` 退出 1 而 `npx tsc --noEmit` 退出 0。
+      # 断言逻辑的唯一实现在 eslint.config.js，这里只是调用者。
+      - name: Lint (frontend)
+        run: npm run lint
 
       - name: Test with coverage
         run: npm run test -- --run --coverage

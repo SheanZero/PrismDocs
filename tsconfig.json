@@ -1,4 +1,8 @@
 {
+  // `types` 里刻意**没有** `vitest/globals`：`vite.config.ts` 不设 `test.globals`，
+  // 测试文件从 `vitest` 具名 import 并手工注册 `afterEach(cleanup)`
+  // （`src/pages/Settings.test.tsx` 的注释写明了为什么）。声明那个类型包等于在配置里
+  // 断言一件与真实设置相反的事——读到它的人会以为 `describe` / `expect` 是全局的。
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
@@ -15,7 +19,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vite/client", "vitest/globals"]
+    "types": ["vite/client"]
   },
   "include": ["src", "vite.config.ts"]
 }
