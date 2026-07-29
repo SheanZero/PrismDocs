@@ -145,7 +145,6 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | INFRA-01 | Phase 1 | Gaps Found |
 | INFRA-02 | Phase 1 | Gaps Found |
-| INFRA-03 | Phase 1 | Pending |
 | IMPORT-01 | Phase 2 | Pending |
 | IMPORT-02 | Phase 2 | Pending |
 | IMPORT-03 | Phase 2 | Pending |
@@ -168,6 +167,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DIGEST-06 | Phase 4 | Pending |
 | DIGEST-07 | Phase 4 | Pending |
 | DIGEST-08 | Phase 4 | Pending |
+| INFRA-03 | Phase 4 | Pending |
 | COMMENT-01 | Phase 5 | Pending |
 | COMMENT-02 | Phase 5 | Pending |
 | COMMENT-03 | Phase 5 | Pending |
@@ -207,6 +207,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 注：INFRA-04/05 为跨切预算，自 Phase 1 起作为设计约束执行，映射至完成验证的 Phase 8（GSD 规则：每条需求映射且仅映射一个 Phase）。
 
+注：INFRA-03 为跨切需求，自 Phase 1 起执行，2026-07-29 由 Phase 1 改映射至完成验证的 Phase 4（同一 GSD 规则：每条需求映射且仅映射一个 Phase，故不拆条）。四点说明：
+
+1. **Phase 1 已完成并通过 `/gsd-verify-work` 验证的三部分**——(a) 钥匙串存取：keyring-core + apple-native-keyring-store 实际写入并可读回；(b) prism-llm 为唯一网络出口与唯一密钥入口：`scripts/check-deps.sh` 的 single-egress / facade-egress / shell-egress 三条断言看住；(c) 自定义 base_url 的存储与值侧校验：`crates/prism-store/src/settings.rs::validate_base_url` 的 scheme / host / userinfo / query / fragment 五项。这三部分**就地记录于此，不因改映射而被抹掉**。
+2. **认领本需求的三份 Phase 1 gap-closure plan**——`01-14`（「代码与配置中无明文密钥」的静态检查面，`scripts/check-secrets.sh`）、`01-23`（密钥输入路径归一化）、以及 `01-25`（即本次改映射本身：它改的是该需求的映射记录，因此认领它而非实现它）。三份的 frontmatter 都声明 `requirements: [INFRA-03]`，与本表的 Phase 4 映射不矛盾——跨切需求自 Phase 1 起执行，验证级验收在所映射的 Phase。
+3. **剩余分句「支持 Anthropic/OpenAI 兼容端点」**（指**实际向端点发出请求**）需要 Phase 4 才存在的 chat client，依据是 ROADMAP Phase 4 的 goal「A3：prism-llm 传输层（流式/重试/keyring）先行交付」。
+4. 本次改映射的目的即守住「每条需求映射且仅映射一个 Phase」：Phase 1 关闭后 INFRA-03 仍有 Phase 4 负责推进，不会成为孤儿需求。
+
 **Coverage:**
 
 - v1 requirements: 61 total（勘误：初稿 Coverage 误记为 51，实际 REQ-ID 计数为 61，2026-07-28 roadmap 创建时更正）
@@ -215,4 +222,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-28*
-*Last updated: 2026-07-28 after roadmap creation (traceability filled, coverage corrected 51→61)*
+*Last updated: 2026-07-29 — Phase 1 收尾（plan 01-25）：INFRA-03 由 Phase 1 改映射至 Phase 4 并加表下注，避免 Phase 1 关闭后成为孤儿需求；Coverage 计数不变（61 / 61 / 0）*
