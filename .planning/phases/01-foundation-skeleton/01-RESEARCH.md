@@ -196,6 +196,10 @@ npm install -D vite@8 @vitejs/plugin-react @tauri-apps/cli@2 typescript vitest
 | @tauri-apps/api | npm | 2026-06-17 | 2.1M/wk | tauri-apps/tauri | OK | Approved |
 | @tauri-apps/cli | npm | 2026-06-28 | 1.8M/wk | tauri-apps/tauri | SUS（近期发版触发） | Approved — 见下 |
 | @vitejs/plugin-react | npm | 2026-07-22 | 75.5M/wk | vitejs/vite-plugin-react | SUS（近期发版触发） | Approved — 见下 |
+| eslint | npm | 最新稳定 10.8.0（2026-07-24） | 152.4M/wk | eslint/eslint | OK | Approved — 人工确认于 01-26 执行期（2026-07-29） |
+| typescript-eslint | npm | 最新稳定 8.65.0（2026-07-20） | 84.5M/wk | typescript-eslint/typescript-eslint | OK | Approved — 人工确认于 01-26 执行期（2026-07-29） |
+| eslint-plugin-react-hooks | npm | 最新稳定 7.1.1（2026-04-17） | 93.6M/wk | facebook/react | OK | Approved — 人工确认于 01-26 执行期（2026-07-29） |
+| globals | npm | 最新稳定 17.8.0（2026-07-26） | 262.0M/wk | sindresorhus/globals | OK | Approved — 人工确认于 01-26 执行期（2026-07-29） |
 
 **关于 `tracing-subscriber` 的补录说明:** 本表建于 phase 规划期，早于 gap-closure plan 01-13。
 01-13 Task 2 是一个 `gate="blocking-human"` 的包合法性闸门——未经审计的包一律按 `[ASSUMED]` 处理，
@@ -204,6 +208,32 @@ npm install -D vite@8 @vitejs/plugin-react @tauri-apps/cli@2 typescript vitest
 等形近名）、仓库 `https://github.com/tokio-rs/tracing`（与本 workspace 已在用的 `tracing` 同仓库同
 owner）、首发 2019-06-27、累计 ~523M 次下载（90 天 ~128M）、最高稳定版 0.3.23（2026-03-13）、
 未被 yank、许可 MIT、`env-filter` feature 存在。本 plan pin `0.3` + features `["env-filter"]`。
+
+**关于四个 ESLint 相关包的补录说明:** 同 `tracing-subscriber`，这四个包晚于本表建表时间，
+由 gap-closure plan 01-26 引入（前端是本项目唯一无 lint 闸门的语言面）。01-26 Task 1 是一个
+`gate="blocking-human"` 的包合法性闸门——未经审计的包一律按 `[ASSUMED]` 处理，不可自动放行
+（沿用 01-13 立下的纪律）。人工于 **2026-07-29** 在 npm registry 上逐项核对并回复 "approved"：
+
+- **名字逐字对**。四个包名都通过 registry 的 `repository.url` 字段逐字解析到上表所列的官方仓库，
+  没有到达任何形近包。特别地，`typescript-eslint`（flat config 时代的统一入口包）与旧的
+  `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` 两包形态**确实是不同的东西**，
+  不是形近名——它依赖那两个 scoped 包且 pin 在同一 `8.65.0`。
+- **install/postinstall 脚本**：四个包全部没有。`globals` 有一个 `prepare` 脚本，但 `prepare`
+  只在从 git 源安装或本地开发时运行，registry tarball 不跑它。
+- **yank/deprecate**：四个包均未被 yank 或 deprecate。许可全部 MIT。
+- **供应链证据强度**：`typescript-eslint` 带 SLSA v1 provenance attestation（GitHub Actions
+  trusted publisher / OIDC），是四者中最强的一条。`eslint` 由 OpenJS Foundation（`eslintbot`）
+  发布，无 attestation。
+- **peer 兼容性**：`typescript-eslint@8.65.0` 要求 `typescript >=4.8.4 <6.1.0`，本仓库的
+  `typescript@^5.9.0` 落在区间内；`eslint-plugin-react-hooks@7.1.1` 接受 `eslint ^10.0.0`。
+  三者同处 eslint 10 线。
+
+**人工明确接受的代价**：`eslint-plugin-react-hooks@7.1.1` 会拉入 `@babel/core ^7.24.4`、
+`@babel/parser`、`hermes-parser ^0.25.1`、`zod`、`zod-validation-error`——传递依赖面明显大于
+其余三个（这是 React Compiler 相关规则带来的）。执行者当时把 **6.x 作为更轻的替代方案提出**，
+人工**明确拒绝了 6.x、选择 7.x**，并接受这份更重的依赖树作为已知成本。本 plan 因此 pin
+`^7.1.1`。实装版本：eslint 10.8.0 / typescript-eslint 8.65.0 / eslint-plugin-react-hooks 7.1.1
+/ globals 17.8.0，`npm ls` 显示 eslint 在树中 deduped 为单一副本。
 
 **Packages removed due to [SLOP] verdict:** none
 
