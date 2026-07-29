@@ -50,10 +50,12 @@ pub fn run() {
             commands::search_documents,
             commands::set_api_key,
             commands::api_key_status,
+            commands::delete_api_key,
             commands::get_setting,
             commands::set_base_url,
             commands::dev_emit_bus_event,
             commands::dev_smoke_stream,
+            commands::dev_seed_sample_docs,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start the PrismDocs shell");

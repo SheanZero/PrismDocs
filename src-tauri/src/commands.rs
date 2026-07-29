@@ -87,6 +87,12 @@ pub async fn api_key_status(state: State<'_, AppState>) -> Result<bool, String> 
     delegate(&state, |engine| engine.api_key_status()).await
 }
 
+/// 删除 API key。幂等：已不存在视为已删除。
+#[tauri::command]
+pub async fn delete_api_key(state: State<'_, AppState>) -> Result<(), String> {
+    delegate(&state, |engine| engine.delete_api_key()).await
+}
+
 #[tauri::command]
 pub async fn get_setting(state: State<'_, AppState>, key: String) -> Result<Option<String>, String> {
     delegate(&state, move |engine| engine.get_setting(&key)).await
@@ -109,6 +115,12 @@ pub async fn dev_emit_bus_event(
         Ok(())
     })
     .await
+}
+
+/// 冒烟页的样例数据入口：写入样例文档并返回它们所属的 project id。
+#[tauri::command]
+pub async fn dev_seed_sample_docs(state: State<'_, AppState>) -> Result<String, String> {
+    delegate(&state, |engine| engine.seed_sample_docs()).await
 }
 
 /// Channel 有序流（Pattern 6）。

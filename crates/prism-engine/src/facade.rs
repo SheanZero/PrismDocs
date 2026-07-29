@@ -85,6 +85,19 @@ impl Engine {
             .read(|c| prism_store::search(c, project_id, q))?)
     }
 
+    /// 写入冒烟页的样例文档，返回它们所属的 project id。
+    ///
+    /// 返回 id 而不是让前端另存一份常量：两份常量必然漂移，而漂移的表现是
+    /// 「播种成功但搜不到」——那正好长得像 FTS 坏了。
+    ///
+    /// 写入后广播 [`EngineEvent::Resync`]：一次播种改的是多份文档，
+    /// 粗粒度失效语义下诚实的说法就是「你手上的东西全都作废，重取」。
+    pub fn seed_sample_docs(&self) -> Result<String, EngineError> {
+        self.store.write(prism_store::seed::insert_samples)?;
+        self.publish(EngineEvent::Resync);
+        Ok(prism_store::seed::SAMPLE_PROJECT_ID.to_string())
+    }
+
     // ------------------------------------------------------------ 非密钥配置
 
     /// 读一条非密钥配置。查不到是 `Ok(None)`，不是错误。
