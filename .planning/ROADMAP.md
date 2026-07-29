@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. SQLite schema v1 落地：WAL + 单写者 + r2d2 读池（query_only=ON）并发读写正常；FTS5 中文查询返回非零结果（CJK tokenizer 在 schema v1 定案）；rusqlite_migration 迁移体系可用，bundled SQLite ≥3.51.3
   4. API key 经 keyring-core + apple-native-keyring-store 写入系统钥匙串并可读回，prism-llm 为唯一网络出口与唯一密钥入口，代码与配置中无明文密钥
 
-**Plans**: 24/28 plans executed
+**Plans**: 25/28 plans executed
 
 Plans:
 **Wave 1**
@@ -102,7 +102,7 @@ Plans:
 **Gap-closure Wave 5** *(blocked on 同 crate 的 Wave 4 计划 —— 文件冲突)*
 
 - [x] 01-17-PLAN.md — 无差别 403 契约对实发路由成立 + handler 执行自身 schema（本轮 WR-03、上轮 WR-14 / WR-12 / IN-04）·依赖 01-16
-- [ ] 01-19-PLAN.md — prism-store 断言强度：恒真断言、版本下界、返回值（上轮 WR-01 / IN-02、01-VERIFICATION 新增 warning）·依赖 01-18
+- [x] 01-19-PLAN.md — prism-store 断言强度：恒真断言、版本下界、返回值（上轮 WR-01 / IN-02、01-VERIFICATION 新增 warning）·依赖 01-18
 
 **Gap-closure Wave 6** *(blocked on 前端计划 —— lint 首跑需要 `src/` 已稳定)*
 
@@ -261,7 +261,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 ∥ 5 → 6 → 7 → 8（�
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 基建骨架 | 24/28 | In Progress|  |
+| 1. 基建骨架 | 25/28 | In Progress|  |
 | 2. F1 导入与同步 | 0/TBD | Not started | - |
 | 3. 锚定引擎 ★ | 0/TBD | Not started | - |
 | 4. F2′ 速读区 | 0/TBD | Not started | - |

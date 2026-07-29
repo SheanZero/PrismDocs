@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-17-PLAN.md
-last_updated: "2026-07-29T14:00:16.261Z"
+stopped_at: Completed 01-19-PLAN.md
+last_updated: "2026-07-29T14:13:36.504Z"
 last_activity: 2026-07-29
 last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 24
+  completed_plans: 25
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 24 of 28（01-01..01-16 已执行；下一份 01-17）
+Plan: 25 of 28（01-01..01-16 已执行；下一份 01-17）
 Status: Ready to execute
 Last activity: 2026-07-29 — 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 89%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -90,6 +90,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P24 | ~25min | 3 tasks | 3 files |
 | Phase 01 P25 | 20min | 2 tasks | 2 files |
 | Phase 01 P17 | ~55min | 3 tasks | 5 files |
+| Phase 01 P19 | 8m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -190,6 +191,9 @@ Recent decisions affecting current work:
 - [Phase ?]: host_of 与 rmcp SDK 的关系定为「一致性闸门」：两侧必须对同一主机名达成一致，否则本层 403 空正文拒（只用『SDK 能否解析』挡不住 127.0.0.1:80@evil.com）
 - [Phase ?]: PrismHandler 自己执行工具 schema 的 projectId 契约（invalid-params、规则形消息、返回未 trim 的原值），执行力不依赖被注入实现
 - [Phase ?]: facade.rs 的注入判别点搬到对同一个 Arc<dyn FeedbackSource> 的直接调用：handler 校验覆盖了 engine 校验的输入集合，MCP 线上已引不出 engine 文本
+- [Phase ?]: 测试名/注释/断言必须对同一条真实存在的性质一致：reader_snapshot_is_isolated 改名 writer_commits_while_a_reader_holds_a_pooled_connection，恒真断言换成 assert_eq!(after, 2)
+- [Phase ?]: SC-3 的 SQLite 下界只有 open.rs::MIN_SQLITE 一个来源；lib.rs 与 concurrency.rs 两条测试都引用它，不再各写一份字面量
+- [Phase ?]: insert_samples 走路径 A（累加 stmt.execute 的受影响行数）而非改签名，调用点 Engine::seed_sample_docs 因此未动
 
 ### Pending Todos
 
@@ -224,6 +228,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T14:00:16.252Z
-Stopped at: Completed 01-17-PLAN.md
+Last session: 2026-07-29T14:13:28.762Z
+Stopped at: Completed 01-19-PLAN.md
 Resume file: None
