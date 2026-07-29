@@ -88,12 +88,15 @@ fn init_body() -> String {
 }
 
 /// 发一次请求；`host` / `origin` / `authorization` 三项按需替换成非法值。
+///
+/// 返回**状态码与响应体**（形态照 B 组的 `oneshot`）。只返回状态码的版本无法表达
+/// T-01-29 的一半——「403 且**空正文**」里的正文那一半（01-REVIEW.md WR-03）。
 async fn probe(
     addr: &std::net::SocketAddr,
     host: Option<&str>,
     origin: Option<&str>,
     authorization: Option<&str>,
-) -> StatusCode {
+) -> (StatusCode, String) {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
@@ -116,17 +119,39 @@ async fn probe(
         req = req.header(reqwest::header::AUTHORIZATION, authorization);
     }
 
-    req.send().await.expect("request reached the server").status()
+    let response = req.send().await.expect("request reached the server");
+    let status = response.status();
+    let body = response.text().await.expect("read response body");
+    (status, body)
 }
 
 fn good_auth() -> String {
     format!("Bearer {GOOD_BEARER}")
 }
 
+/// T-01-29 的拒绝形态：403 **且空正文**。两半都要断言。
+///
+/// 只断言 `is_client_error()` 会让 401 / 400 / 404 全部算通过，而状态码分化正是
+/// 本契约禁止的那件事（01-REVIEW.md WR-03）；只断言状态码会漏掉 SDK 那种
+/// 「403 但带正文点名层次」的形态。
+#[track_caller]
+fn assert_denied_uniformly(observed: &(StatusCode, String), what: &str) {
+    assert_eq!(
+        observed.0,
+        StatusCode::FORBIDDEN,
+        "{what}: 拒绝的状态码不是 403 —— 状态码分化会把三层试探变成逐层试探"
+    );
+    assert!(
+        observed.1.is_empty(),
+        "{what}: 拒绝响应带了正文: {}",
+        observed.1
+    );
+}
+
 #[tokio::test]
 async fn rejects_foreign_host() {
     let (addr, ct) = serve().await;
-    let status = probe(
+    let observed = probe(
         &addr,
         Some("evil.example.com"),
         Some("http://127.0.0.1"),
@@ -135,17 +160,13 @@ async fn rejects_foreign_host() {
     .await;
     ct.cancel();
 
-    assert_eq!(
-        status,
-        StatusCode::FORBIDDEN,
-        "Origin 与 bearer 均合法、只有 Host 是外域，却没有 403"
-    );
+    assert_denied_uniformly(&observed, "Origin 与 bearer 均合法、只有 Host 是外域");
 }
 
 #[tokio::test]
 async fn rejects_foreign_origin() {
     let (addr, ct) = serve().await;
-    let status = probe(
+    let observed = probe(
         &addr,
         None,
         Some("https://evil.example.com"),
@@ -154,11 +175,7 @@ async fn rejects_foreign_origin() {
     .await;
     ct.cancel();
 
-    assert_eq!(
-        status,
-        StatusCode::FORBIDDEN,
-        "Host 与 bearer 均合法、只有 Origin 是外域，却没有 403"
-    );
+    assert_denied_uniformly(&observed, "Host 与 bearer 均合法、只有 Origin 是外域");
 }
 
 #[tokio::test]
@@ -189,32 +206,87 @@ async fn rejects_missing_or_wrong_bearer() {
     .await;
     ct.cancel();
 
-    assert!(missing.is_client_error(), "无 Authorization 头却未被拒: {missing}");
-    assert!(
-        wrong_same_len.is_client_error(),
-        "等长错误 token 未被拒: {wrong_same_len}"
-    );
-    assert!(
-        wrong_short.is_client_error(),
-        "短错误 token 未被拒: {wrong_short}"
-    );
-    assert!(
-        not_bearer.is_client_error(),
-        "非 Bearer scheme 未被拒: {not_bearer}"
-    );
+    // 收紧自 `is_client_error()`：那条断言对 401 是绿的，而「bearer 缺失单独用 401」
+    // 正是 T-01-29 刻意不做的事——它告诉攻击者前两层已经过了。
+    assert_denied_uniformly(&missing, "无 Authorization 头");
+    assert_denied_uniformly(&wrong_same_len, "等长错误 token");
+    assert_denied_uniformly(&wrong_short, "短错误 token");
+    assert_denied_uniformly(&not_bearer, "非 Bearer scheme");
 }
 
 /// A 组的阴性对照：三层不是把所有请求都拒了。
+///
+/// 断言 `is_success()` 而不是 `!is_client_error()`：后者对 500 / 502 同样是绿的，
+/// 而这条测试**知道成功长什么样**，没有理由用宽松形态（01-REVIEW-prior.md WR-14）。
+/// 收紧之后它同时成为「请求真的到达了 mcp service」的证据——三层放行不等于下游能跑。
 #[tokio::test]
 async fn accepts_fully_valid_request() {
     let (addr, ct) = serve().await;
-    let status = probe(&addr, None, Some("http://127.0.0.1"), Some(&good_auth())).await;
+    let (status, _) = probe(&addr, None, Some("http://127.0.0.1"), Some(&good_auth())).await;
     ct.cancel();
 
     assert!(
-        !status.is_client_error(),
-        "三层头全合法的请求仍被 4xx 拒绝: {status}"
+        status.is_success(),
+        "三层头全合法的请求没有得到 2xx: {status}"
     );
+}
+
+/// `rejections_do_not_disclose_which_layer_denied` 的**实发路由**版本。
+///
+/// 那一条跑的是三个只在测试里存在的 sentinel router，因此它守的是「每一层各自的
+/// 拒绝形态」；它**碰不到** `serve_loopback` 实际组装出来的链路，也就碰不到 rmcp
+/// SDK 内层那套「403 带正文 / 400 带正文」的拒绝（01-REVIEW.md WR-03）。两者互补：
+/// 那一条证明每层自己的形态，这一条证明发货形态下三种非法请求**逐字节同形**。
+#[tokio::test]
+async fn the_shipped_route_denies_every_layer_identically() {
+    let (addr, ct) = serve().await;
+
+    // 每次只让一项非法，其余两项合法 —— 这样被拒的确实是不同的那一层。
+    let host_denied = probe(
+        &addr,
+        Some("evil.example.com"),
+        Some("http://127.0.0.1"),
+        Some(&good_auth()),
+    )
+    .await;
+    let origin_denied = probe(
+        &addr,
+        None,
+        Some("https://evil.example.com"),
+        Some(&good_auth()),
+    )
+    .await;
+    let bearer_denied = probe(
+        &addr,
+        None,
+        Some("http://127.0.0.1"),
+        Some(&format!("Bearer {WRONG_SAME_LEN}")),
+    )
+    .await;
+    // 口径分叉的那个形态（01-17 Task 1）：本层与 SDK 曾经对它算出不同主机名，
+    // SDK 会用一个**带正文的 403** 拒它。它必须与上面三条逐字节相同。
+    let split_parse_denied = probe(
+        &addr,
+        Some("127.0.0.1:80@evil.com"),
+        Some("http://127.0.0.1"),
+        Some(&good_auth()),
+    )
+    .await;
+    ct.cancel();
+
+    assert_eq!(
+        host_denied, origin_denied,
+        "非法 Host 与非法 Origin 的响应不同 —— 实发路由上存在层次 oracle"
+    );
+    assert_eq!(
+        origin_denied, bearer_denied,
+        "非法 Origin 与非法 bearer 的响应不同 —— 实发路由上存在层次 oracle"
+    );
+    assert_eq!(
+        bearer_denied, split_parse_denied,
+        "解析口径分叉的 Host 拿到了与其余三条不同的响应 —— SDK 内层的带正文拒绝可达了"
+    );
+    assert_denied_uniformly(&host_denied, "实发路由");
 }
 
 // ---------------------------------------------------------------------------
