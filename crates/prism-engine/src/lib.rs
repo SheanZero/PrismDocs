@@ -8,11 +8,12 @@
 //!
 //! * [`bus`] —— 事件总线（engine 唯一的订阅点）
 //! * [`facade`] —— [`Engine`]：单写者句柄的持有者与三条门面路径的编排
-//! * `services` —— `impl FeedbackSource / CommentSink for Engine`（D-09 的注入面，Task 2 落地）
+//! * [`services`] —— `impl FeedbackSource / CommentSink for Engine`（D-09 的注入面）
 
 pub mod bus;
 pub mod error;
 pub mod facade;
+pub mod services;
 
 pub use bus::{EventBus, BUS_CAPACITY};
 pub use error::EngineError;
