@@ -19,6 +19,10 @@ import {
 /// total=3 的流即使实现是乱序的也大概率看起来是对的——那种绿证明不了任何事。
 const SMOKE_TOTAL = 1000;
 
+/// 与 `Settings.tsx` 第 39 行**逐字同形**。两个页面各写一份是本 phase 刻意接受的
+/// 重复（D-06 禁的是投机建共享布局层），但形状必须一致——否则下一个页面会出现第三种。
+type Notice = { tone: "ok" | "error"; text: string } | null;
+
 export type SmokeVerdict =
   | { ok: true; ticks: number }
   | { ok: false; reason: string };
@@ -70,7 +74,7 @@ export default function DevSmokePage() {
   const [streaming, setStreaming] = useState(false);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
 
   // 计数器走一条**独立**的 listen，与 useEngineInvalidation 的失效路径分开——
   // 这样「事件到了几次」是可直接读的数字，而不是要从 refetch 次数反推的东西。
@@ -86,7 +90,7 @@ export default function DevSmokePage() {
       setEventCount((n) => n + 1);
     });
     pending.catch(() => {
-      if (active) setNotice(errorCopy(LISTEN_FAILED));
+      if (active) setNotice({ tone: "error", text: errorCopy(LISTEN_FAILED) });
     });
     return () => {
       active = false;
@@ -107,7 +111,7 @@ export default function DevSmokePage() {
     try {
       await devEmitBusEvent(projectId, "d1");
     } catch (err) {
-      setNotice(errorCopy(err));
+      setNotice({ tone: "error", text: errorCopy(err) });
     }
   }
 
@@ -122,7 +126,7 @@ export default function DevSmokePage() {
       });
       setVerdict(verifySmokeStream(collected.current, SMOKE_TOTAL));
     } catch (err) {
-      setNotice(errorCopy(err));
+      setNotice({ tone: "error", text: errorCopy(err) });
     } finally {
       setStreaming(false);
     }
@@ -134,10 +138,10 @@ export default function DevSmokePage() {
       // 用引擎返回的 id，而不是页面上另存一份常量——两份必然漂移，
       // 而漂移的表现是「播种成功但搜不到」，正好长得像 FTS 坏了。
       setProjectId(await devSeedSampleDocs());
-      setNotice("样例文档已写入。");
+      setNotice({ tone: "ok", text: "样例文档已写入。" });
       void queryClient.invalidateQueries();
     } catch (err) {
-      setNotice(errorCopy(err));
+      setNotice({ tone: "error", text: errorCopy(err) });
     }
   }
 
@@ -146,7 +150,7 @@ export default function DevSmokePage() {
     try {
       setHits(await searchDocuments(projectId, query));
     } catch (err) {
-      setNotice(errorCopy(err));
+      setNotice({ tone: "error", text: errorCopy(err) });
     }
   }
 
@@ -156,7 +160,7 @@ export default function DevSmokePage() {
       <p style={hint}>
         隐藏页，不放导航入口。当前 project：<code>{projectId}</code>
       </p>
-      {notice && <p role="status">{notice}</p>}
+      <NoticeLine notice={notice} />
 
       <section style={card}>
         <h2>① 总线事件往返（notify-then-fetch）</h2>
@@ -246,6 +250,28 @@ export default function DevSmokePage() {
         </ul>
       </section>
     </main>
+  );
+}
+
+/// 与 `Settings.tsx` 的 `NoticeLine` **同源**（那边是第一份，本页是第二份）。
+///
+/// 分 tone 而不是一个 region 通吃：`status` 是礼貌 live region，读屏不会为它打断，
+/// 而失败——尤其是「本页从此收不到任何事件」这种不可重试的失败——必须被播报出来。
+/// 反过来，成功不走 `alert`：每次成功都打断，等于把 alert 这个信号磨没。
+/// 无通知时两个 region 都不渲染，不留空节点。
+function NoticeLine({ notice }: { notice: Notice }) {
+  if (!notice) return null;
+  if (notice.tone === "error") {
+    return (
+      <p role="alert" style={{ color: "#b00020" }}>
+        {notice.text}
+      </p>
+    );
+  }
+  return (
+    <p role="status" style={{ color: "#00701a" }}>
+      {notice.text}
+    </p>
   );
 }
 
