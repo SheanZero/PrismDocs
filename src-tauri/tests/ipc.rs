@@ -23,15 +23,17 @@ use tauri::webview::InvokeRequest;
 use tauri::{App, Manager, WebviewWindow, WebviewWindowBuilder};
 
 /// 命令面的全集。`generate_handler!` 里注册了几个，这里就必须列几个。
-const COMMANDS: [&str; 8] = [
+const COMMANDS: [&str; 10] = [
     "dev_ping",
     "search_documents",
     "set_api_key",
     "api_key_status",
+    "delete_api_key",
     "get_setting",
     "set_base_url",
     "dev_emit_bus_event",
     "dev_smoke_stream",
+    "dev_seed_sample_docs",
 ];
 
 /// 用临时目录的库装配一个 mock app。
@@ -48,10 +50,12 @@ fn mock_app() -> (App<MockRuntime>, tempfile::TempDir) {
             commands::search_documents,
             commands::set_api_key,
             commands::api_key_status,
+            commands::delete_api_key,
             commands::get_setting,
             commands::set_base_url,
             commands::dev_emit_bus_event,
             commands::dev_smoke_stream,
+            commands::dev_seed_sample_docs,
         ])
         .build(tauri::generate_context!("tauri.conf.json"))
         .expect("failed to build the mock app");
@@ -121,20 +125,22 @@ fn smoke_stream_command_is_registered_and_returns_ok() {
 /// 不需要钥匙串的六个命令：本测试进程里它们必须**返回 Ok**。
 ///
 /// 断言 Ok 而不是「错误不像未注册」，是因为后者对「命令注册了但委托写错了」不敏感。
-const COMMANDS_EXPECTED_OK: [&str; 6] = [
+const COMMANDS_EXPECTED_OK: [&str; 7] = [
     "dev_ping",
     "search_documents",
     "get_setting",
     "set_base_url",
     "dev_emit_bus_event",
     "dev_smoke_stream",
+    "dev_seed_sample_docs",
 ];
 
 /// 需要钥匙串的两个命令。
 ///
 /// 本测试进程**从不调用** `init_secrets`，所以 `keyring_core` 没有默认后端，
 /// 这两条会在触碰真实登录钥匙串之前就失败——测试因此不会弹授权框、CI 也不会挂。
-const COMMANDS_NEEDING_KEYCHAIN: [&str; 2] = ["set_api_key", "api_key_status"];
+const COMMANDS_NEEDING_KEYCHAIN: [&str; 3] =
+    ["set_api_key", "api_key_status", "delete_api_key"];
 
 /// 八个命令全部可经 IPC 到达，且错误串已被映射收敛。
 ///
