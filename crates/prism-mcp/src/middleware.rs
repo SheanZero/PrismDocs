@@ -115,6 +115,14 @@ pub async fn require_origin_allowlist(request: Request, next: Next) -> Response 
 }
 
 /// ③ bearer token，**常数时间比较**（Security Domain V2 / T-01-06）。
+///
+/// scheme 按 RFC 7235 §2.1 大小写不敏感匹配，且容忍 scheme 与 credentials 之间的
+/// `1*SP`：RFC 6750 的客户端合法地发 `bearer` / `BEARER`，而 Phase 6 的 MCP 客户端
+/// （Claude Code 与其他 agent）不受本项目控制。本层刻意无诊断——一个合规客户端与
+/// 一次攻击在它面前完全同形，把合规形态判成攻击的代价只由用户承担（WR-07）。
+///
+/// 三条 `deny` 的原因串都是编译期常量、只进本地 tracing；响应仍一律 403 + 空正文，
+/// 本层不引入任何可观测的差异化（T-01-29）。
 pub async fn require_bearer(
     State(deps): State<McpDeps>,
     request: Request,
@@ -126,9 +134,16 @@ pub async fn require_bearer(
     let Ok(raw) = raw.to_str() else {
         return deny("non-ascii Authorization header");
     };
-    let Some(presented) = raw.strip_prefix("Bearer ") else {
-        return deny("Authorization scheme is not Bearer");
+    let Some((scheme, presented)) = raw.split_once(' ') else {
+        return deny("Authorization header carries no credentials");
     };
+    if !scheme.eq_ignore_ascii_case("bearer") {
+        return deny("Authorization scheme is not Bearer");
+    }
+    // 只裁**前导**空白（RFC 7235 的 `1*SP`）。尾随 OWS 由 HTTP 头解析层负责，在这里
+    // 再 trim 一次会让「token 本身末尾带空白」与「header 里多打了空格」不可区分；
+    // 配置侧的归一化已在 `McpDeps::new` 做过一次，两侧因此对同一份字节达成一致。
+    let presented = presented.trim_start();
     if !constant_time_eq(deps.expose_bearer(), presented) {
         return deny("bearer token mismatch");
     }

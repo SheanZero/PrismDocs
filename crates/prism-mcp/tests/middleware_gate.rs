@@ -351,10 +351,45 @@ async fn bearer_layer_alone_is_what_rejects_a_bad_token() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains(SENTINEL));
+
+    // 阴性对照表（缺了它，「把 require_bearer 改成有 Authorization 头就放行」也能让
+    // 上面的拒绝表全绿——那不是门禁，是一块写着门禁的牌子）。
+    //
+    // 三行都是 RFC 合规客户端的真实形态：RFC 7235 §2.1 定义 auth-scheme 为**大小写
+    // 不敏感**的 token，RFC 6750 的客户端合法地发 `bearer` / `BEARER`；同一条语法
+    // 里 scheme 与 credentials 之间允许 `1*SP`。Phase 6 的 MCP 客户端（Claude Code
+    // 与其他 agent）不受本项目控制，而本门禁刻意无诊断——一个合规客户端与一次攻击
+    // 在它面前完全同形，误拒的诊断成本因此极高（01-REVIEW.md WR-07）。
+    let accepted = [
+        (
+            format!("bearer {GOOD_BEARER}"),
+            "小写 scheme —— RFC 7235 §2.1 的 auth-scheme 大小写不敏感",
+        ),
+        (
+            format!("BEARER {GOOD_BEARER}"),
+            "大写 scheme —— 同上，比较不得是字节精确的",
+        ),
+        (
+            format!("Bearer   {GOOD_BEARER}"),
+            "scheme 与 credentials 之间多个空格 —— RFC 7235 允许 1*SP",
+        ),
+    ];
+
+    for (authorization, label) in accepted {
+        let guarded = sentinel_router().layer(from_fn_with_state(deps(), require_bearer));
+        let (status, body) = oneshot(
+            guarded,
+            request("127.0.0.1:51234", None, Some(&authorization)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{label}: 合规客户端被误拒");
+        assert!(body.contains(SENTINEL), "{label}: 请求没能到达 handler");
+    }
 }
 
 /// CR-03 的现实攻击形态：向一个**合法配置**的门禁发 `Authorization: Bearer `
-/// （Bearer 之后是空 token）。`strip_prefix("Bearer ")` 对它给出 `Some("")`，
+/// （Bearer 之后是空 token）。解析层对它给出 scheme = `Bearer`、credentials = 空串
+/// （旧形态的 `strip_prefix("Bearer ")` 同样给出 `Some("")`），
 /// 因此空呈递值不会在解析阶段被挡掉，一路走到比较层——那里必须拒。
 #[tokio::test]
 async fn an_empty_presented_token_is_denied_by_the_bearer_layer_alone() {
@@ -454,6 +489,8 @@ async fn the_bearer_token_never_appears_in_a_response() {
     for authorization in [
         None,
         Some(good_auth()),
+        // 小写 scheme 走的是**放行**分支，也不得回显 token。
+        Some(format!("bearer {GOOD_BEARER}")),
         Some(format!("Bearer {WRONG_SAME_LEN}")),
     ] {
         let guarded = sentinel_router().layer(from_fn_with_state(deps(), require_bearer));
