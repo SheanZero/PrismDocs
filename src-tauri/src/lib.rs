@@ -30,7 +30,18 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             use tauri::Manager;
-            app.manage(AppState::bootstrap()?);
+
+            let state = AppState::bootstrap()?;
+
+            // 钥匙串后端注册失败**不阻断启动**（D-06：无 key 时应用照常启动）。
+            // 把它冒泡给 setup 会让「登录钥匙串被锁」变成开不了窗口。
+            #[cfg(target_os = "macos")]
+            if let Err(err) = state.engine.init_secrets() {
+                tracing::warn!(error = %err, "keychain backend unavailable; secrets are disabled");
+            }
+
+            bus_adapter::spawn(app.handle().clone(), state.engine.subscribe());
+            app.manage(state);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![commands::dev_ping])

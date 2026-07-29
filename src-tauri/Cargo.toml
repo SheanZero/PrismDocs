@@ -24,6 +24,7 @@ prism-types = { workspace = true }
 prism-store = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true }
 
 [features]
 test = ["tauri/test"]
