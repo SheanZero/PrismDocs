@@ -23,6 +23,22 @@ use prism_types::{CommentSink, FeedbackItem, FeedbackSource, Receipt, ServiceErr
 
 use crate::facade::Engine;
 
+/// 回执 `status` 的受控取值集合。
+///
+/// `Receipt.status` 是从 MCP 线上直接反序列化的 `String`——完全不可信的外部输入。
+/// 01-13 给进程装上 subscriber 之后，`record_receipt` 的那行日志是**真的会写出去**的；
+/// 一个不受约束的外部字段可以把整段用户文档、或含嵌入换行的伪造日志行写进本地日志
+/// 文件（T-01G-18 / T-01G-19）。受控集合让这两类输入在抵达日志之前就被拒。
+///
+/// **精确匹配，不做大小写折叠**：线协议值应当是确定的小写 token，`Applied` 与
+/// `applied` 之间的宽容只会把「哪些值合法」这件事重新变成不确定的。
+///
+/// **与 Phase 5 的衔接点**：真实的评论状态机要到 Phase 5（COMMENT-03）才定案。
+/// 届时把取值集合上移到 `prism-types`、把 `Receipt.status` 做成 enum 是自然的下一步。
+/// 现在不做，是因为那会连带改 `prism-types/src/dto.rs` 的 serde 形态与 `prism-mcp`
+/// 三个测试文件的构造点；上移的条件是 COMMENT-03 定下真实状态机。
+const RECEIPT_STATUSES: [&str; 3] = ["applied", "rejected", "deferred"];
+
 impl FeedbackSource for Engine {
     /// 列出某个项目待处理的反馈。
     ///
@@ -50,9 +66,21 @@ impl CommentSink for Engine {
     ///
     /// **日志里只有 comment_id 与 status，没有正文**（T-01-33）：回执正文来自外部
     /// agent，可能整段引用用户文档；一条 `?receipt` 就把它写进了本地日志文件。
+    ///
+    /// 同一条推理逐字适用于 `status` 本身——它也是外部字段——所以它在被记录之前
+    /// 必须落在 [`RECEIPT_STATUSES`] 里。
     fn record_receipt(&self, receipt: Receipt) -> Result<(), ServiceError> {
         if receipt.comment_id.trim().is_empty() {
             return Err(ServiceError::Invalid("comment id must not be empty".into()));
+        }
+        // 顺序不可调换：这条校验必须排在下面的 tracing::info! 之前。写在日志之后的
+        // 实现在功能上「也拒了」，但被拒的那个值已经进了日志——那正是本条要防的事。
+        // 顺序由 `the_service_impls_contain_no_await` 里的源码断言看住。
+        if !RECEIPT_STATUSES.contains(&receipt.status.as_str()) {
+            // 只描述规则，不回显传入的值（文件头第二条纪律 / T-01-20）。
+            return Err(ServiceError::Invalid(
+                "status is not a recognised value".into(),
+            ));
         }
         tracing::info!(
             comment_id = %receipt.comment_id,
