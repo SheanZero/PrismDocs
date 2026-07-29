@@ -31,7 +31,12 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/", "node_modules/", "src-tauri/", "coverage/"],
+    // `target/` 是 cargo 的构建输出目录（`.gitignore` 里的 `/target`）。Tauri 会在
+    // 它下面生成一批 `__global-api-script.js`——首跑用 `--format json` 数过，`eslint .`
+    // 确实在走它们（18 个文件）。它们今天恰好 0 报错，但那是**空洞的绿**：生成物只
+    // 落进上面那个不定义任何规则的基础块。留着它只有坏处——一旦某次生成物里带了
+    // 会命中规则的写法，`npm run lint` 就会因为一个没人写过的文件而失败。
+    ignores: ["dist/", "node_modules/", "src-tauri/", "coverage/", "target/"],
   },
 
   // ── 基础块（非类型感知）：仓库根的配置文件 ────────────────────────────────
