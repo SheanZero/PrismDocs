@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-18-PLAN.md
-last_updated: "2026-07-29T12:32:11.970Z"
+stopped_at: Completed 01-20-PLAN.md
+last_updated: "2026-07-29T12:40:02.351Z"
 last_activity: 2026-07-29
 last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 17 of 28（01-01..01-16 已执行；下一份 01-17）
+Plan: 18 of 28（01-01..01-16 已执行；下一份 01-17）
 Status: Ready to execute
 Last activity: 2026-07-29 — 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 
-Progress: [██████░░░░] 61%
+Progress: [██████░░░░] 64%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -83,6 +83,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P15 | ~20min | 2 tasks | 2 files |
 | Phase 01 P16 | ~35min | 3 tasks | 3 files |
 | Phase 01 P18 | 15min | 3 tasks | 2 files |
+| Phase 01 P20 | ~20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -162,6 +163,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-18: 畸形 SQLite 版本串复用 SqliteTooOld 而非加第三个变体——「无法证明够新」与「确实太旧」同一处置
 - [Phase ?]: 01-18: 断言落在解析结果而非下游布尔上——计划给的六条版本用例在当前 MIN_SQLITE 下恒真，真正的放行口是 3.x.53 → (3,53,0)
 - [Phase ?]: 01-18: busy 复现测试留下（计划要求删除）——否则 close() 读 busy 列的三行再无行为面保护；代价是 lib 测试从 0.03s 变 5.5s
+- [Phase ?]: 01-20: 回执 status 受控取值集合放 prism-engine 侧常量，不改 Receipt.status 类型——避免与 01-16/01-17 抢 dto.rs 与 prism-mcp 测试；上移条件是 Phase 5 COMMENT-03 定下真实状态机
+- [Phase ?]: 01-20: status 精确匹配不做大小写折叠（Applied 被拒）——线协议值应当是确定的小写 token
+- [Phase ?]: 01-20: 移除零构造点的 ServiceError::Backend（Phase 5 在关键路径下游，不属于「很快落地」）；重新引入检查点与文本约束就地写在文档注释里
 
 ### Pending Todos
 
@@ -195,6 +199,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T12:32:11.961Z
-Stopped at: Completed 01-18-PLAN.md
+Last session: 2026-07-29T12:39:38.596Z
+Stopped at: Completed 01-20-PLAN.md
 Resume file: None
