@@ -141,6 +141,88 @@ mod tests {
         ));
     }
 
+    /// 受控取值集合的两端：三个 token 全部放行，空串不放行。
+    ///
+    /// 刻意写死字面量而不是遍历 `RECEIPT_STATUSES`——遍历常量的版本在常量被清空时
+    /// 依然全绿（零次迭代），那正是本条要防的退化。
+    #[test]
+    fn every_controlled_receipt_status_is_accepted_and_an_empty_one_is_not() {
+        let (_dir, engine) = engine();
+        for status in ["applied", "rejected", "deferred"] {
+            let receipt = Receipt {
+                comment_id: "c-1".to_string(),
+                status: status.to_string(),
+            };
+            assert!(
+                engine.record_receipt(receipt).is_ok(),
+                "受控取值 {status} 被拒了"
+            );
+        }
+
+        let empty = Receipt {
+            comment_id: "c-1".to_string(),
+            status: String::new(),
+        };
+        assert!(matches!(
+            engine.record_receipt(empty),
+            Err(ServiceError::Invalid(_))
+        ));
+    }
+
+    /// 拒绝文本逐字固定，且不回显传入的 status（T-01G-20）。
+    ///
+    /// 形态照抄 `rejection_text_does_not_echo_the_caller_argument`：这段文本会经
+    /// MCP 响应回抛给外部 agent，回显被拒的值等于把外泄面从日志挪到响应，而不是关掉它。
+    /// 探针取大小写不符的 `Applied`——受控集合是精确匹配，不做大小写折叠。
+    #[test]
+    fn status_rejection_text_does_not_echo_the_caller_argument() {
+        let (_dir, engine) = engine();
+        let probe = "Applied";
+        let msg = engine
+            .record_receipt(Receipt {
+                comment_id: "c-1".to_string(),
+                status: probe.to_string(),
+            })
+            .expect_err("大小写不符的 status 应被拒——线协议值是确定的小写 token")
+            .to_string();
+        assert_eq!(
+            msg, "invalid request: status is not a recognised value",
+            "校验文本漂移了——拒绝文本必须只陈述规则"
+        );
+        assert!(!msg.contains(probe), "拒绝文本回显了传入的 status: {msg}");
+    }
+
+    /// 含嵌入换行的超长 status 在抵达日志行之前就被拒（T-01G-18 / T-01G-19）。
+    ///
+    /// 这是 WR-13 的原始攻击面：`Receipt.status` 直接从 MCP 线上反序列化，
+    /// 一个外部 agent 可以把整段用户文档、或伪造的额外日志行塞进这个字段。
+    #[test]
+    fn record_receipt_rejects_a_long_multiline_status() {
+        let (_dir, engine) = engine();
+        let forged = format!(
+            "applied\n{}\nINFO forged log line: {}",
+            "user document body ".repeat(1024),
+            "x".repeat(4096)
+        );
+        let msg = engine
+            .record_receipt(Receipt {
+                comment_id: "c-1".to_string(),
+                status: forged,
+            })
+            .expect_err("含换行的超长 status 应被拒")
+            .to_string();
+        assert_eq!(msg, "invalid request: status is not a recognised value");
+        assert!(!msg.contains('\n'), "拒绝文本里出现了换行: {msg}");
+        assert!(
+            !msg.contains("user document body"),
+            "拒绝文本回显了被拒的正文: {msg}"
+        );
+        assert!(
+            !msg.contains("forged log line"),
+            "拒绝文本回显了伪造的日志行: {msg}"
+        );
+    }
+
     /// 两个 impl 都必须是同步的（纪律 1）。
     ///
     /// `.await` 一旦出现，trait 就得变成 async，`Arc<dyn FeedbackSource>` 的
@@ -164,5 +246,22 @@ mod tests {
             1
         );
         assert_eq!(production.matches("impl CommentSink for Engine").count(), 1);
+
+        // status 校验必须排在回执日志行之前。一个把校验写在日志之后的实现在功能上
+        // 「也拒了」——上面那几条行为测试全都仍然会绿——但被拒的那个值已经进了日志，
+        // 那正是 WR-13 要防的事。行为测试对顺序没有判别力，所以顺序由这里看住。
+        //
+        // 锚点取完整语句而非裸标识符：`RECEIPT_STATUSES` 单独出现在常量声明处，
+        // 用它做锚点会锚到声明而不是校验点。
+        let guard = production
+            .find("!RECEIPT_STATUSES.contains(&receipt.status.as_str())")
+            .expect("status 受控取值校验不见了——外部字段会直接进日志");
+        let log = production
+            .find("\"recorded an agent receipt\"")
+            .expect("回执日志行不见了");
+        assert!(
+            guard < log,
+            "status 校验被排到了 tracing::info! 之后：被拒的值仍会先写进日志"
+        );
     }
 }
