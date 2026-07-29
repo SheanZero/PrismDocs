@@ -19,6 +19,15 @@ pub use bus::{EventBus, BUS_CAPACITY};
 pub use error::EngineError;
 pub use facade::Engine;
 
+/// `EngineError::Llm` 的载荷类型。
+///
+/// 转出来是因为它是一个**公开变体的载荷**：不这样做，任何不依赖 `prism-llm` 的
+/// 上层（`src-tauri` 就是，而且必须一直是——NFR-03 的「唯一入口」要求 shell
+/// 通往钥匙串的路线只有经 facade 这一条）就无法命名它，于是也无法为
+/// 「密钥类错误映射成什么」写测试。转的是**错误类型**，不是密钥入口：
+/// `secrets` 模块仍然只有 `prism-engine` 够得着。
+pub use prism_llm::LlmError;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -45,7 +45,16 @@ pub fn run() {
             app.manage(state);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::dev_ping])
+        .invoke_handler(tauri::generate_handler![
+            commands::dev_ping,
+            commands::search_documents,
+            commands::set_api_key,
+            commands::api_key_status,
+            commands::get_setting,
+            commands::set_base_url,
+            commands::dev_emit_bus_event,
+            commands::dev_smoke_stream,
+        ])
         .run(tauri::generate_context!())
         .expect("failed to start the PrismDocs shell");
 }

@@ -123,6 +123,44 @@ check_facade_egress() {
   echo "OK: prism-engine only ever reaches network/secrets through prism-llm"
 }
 
+# 成功标准 4（NFR-03）第三半：shell 通往钥匙串的路线只有「经 facade」这一条。
+#
+# 01-07 把 facade 的形态守住了，但受检集合里**没有 prismdocs-shell**。
+# 现状是 shell → prism-engine → prism-llm → keyring，即 NFR-03 要的单一入口；
+# 而 `src-tauri/Cargo.toml` 里加一行 `prism-llm = ...` 就能让它变成两条路，
+# 且上面五条断言没有一条会红（shell 不在任何一个受检集合里）。
+#
+# 形态与 check_facade_egress 同构（直接依赖 + 反向闭包），只是允许名单里多了
+# prism-engine——它在这条链上是**合法的中间跳**，而不是第二个出口。
+check_shell_egress() {
+  local direct inverted offenders c
+  direct=$(cargo tree -p prismdocs-shell --edges normal --depth 1 --prefix none | tail -n +2)
+  if grep -Eq "^($EGRESS_CRATES) " <<<"$direct"; then
+    echo "FAIL: prismdocs-shell declares a network/secret crate as a direct dependency" >&2
+    return 1
+  fi
+  if grep -Eq '^prism-llm ' <<<"$direct"; then
+    echo "FAIL: prismdocs-shell depends on prism-llm directly —— 密钥入口不再唯一" >&2
+    return 1
+  fi
+
+  for c in reqwest keyring-core apple-native-keyring-store; do
+    if ! cargo tree -p prismdocs-shell --edges normal --prefix none \
+         | grep -Eq "^$c "; then
+      continue
+    fi
+    inverted=$(cargo tree -p prismdocs-shell --edges normal --invert "$c" --prefix none)
+    offenders=$(grep -oE '^prism-[a-z]+' <<<"$inverted" \
+                | sort -u | grep -vE '^(prism-llm|prism-engine)$' || true)
+    if [ -n "$offenders" ]; then
+      echo "FAIL: $c reaches prismdocs-shell through a crate other than prism-llm:" >&2
+      echo "$offenders" >&2
+      return 1
+    fi
+  done
+  echo "OK: prismdocs-shell only ever reaches network/secrets through prism-engine -> prism-llm"
+}
+
 main() {
   case "${1:-all}" in
     dup)            check_dup ;;
@@ -133,17 +171,20 @@ main() {
     single-egress)
       check_single_egress
       check_facade_egress
+      check_shell_egress
       ;;
     facade-egress)  check_facade_egress ;;
+    shell-egress)   check_shell_egress ;;
     all)
       check_dup
       check_tauri_free
       check_no_cycle
       check_single_egress
       check_facade_egress
+      check_shell_egress
       ;;
     *)
-      echo "usage: $0 [dup|tauri-free|no-cycle|single-egress|facade-egress|all]" >&2
+      echo "usage: $0 [dup|tauri-free|no-cycle|single-egress|facade-egress|shell-egress|all]" >&2
       exit 2
       ;;
   esac
