@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 3
+open_count: 4
 waived_count: 0
 fixed_count: 0
-total_count: 3
-last_updated: 2026-07-29T00:24:01.614Z
+total_count: 4
+last_updated: 2026-07-29T00:42:43.308Z
 ---
 
 # Broken Windows Ledger
@@ -18,6 +18,7 @@ last_updated: 2026-07-29T00:24:01.614Z
 | 1 | 01 | deviation | crates/prism-store/src/open.rs |  | 迁移先于建池的顺序无行为面哨兵：计划设想的反证实测不成立，目前只由源码顺序断言守住 | open |  | 2026-07-28T23:13:51.042Z |  |
 | 2 | 01 | deviation | crates/prism-mcp/tests/middleware_gate.rs |  | 计划的端到端摘层反证（摘 require_local_host / require_origin_allowlist 后对应测试变红）实跑不成立：rmcp SDK 自带的 allowed_hosts/allowed_origins 会替它拒掉。落点唯一的反证改由 B 组 sentinel-router 隔离测试承担 | open |  | 2026-07-28T23:59:36.146Z |  |
 | 3 | 01 | deviation | scripts/check-deps.sh |  | 计划 01-07 的两条验收项在原 check-deps.sh 下互斥（facade 必须依赖 prism-llm 才能转交密钥，但 prism-engine 在 PURE_CRATES 的整树断言里）；已拆成叶子整树断言 + facade 反向闭包断言 | open |  | 2026-07-29T00:24:01.614Z |  |
+| 4 | 01 | deviation | src-tauri/tests/ipc.rs |  | 研究文档示例的 ipc 请求 URL (http://tauri.localhost) 在 macOS 上非本地来源，会让每个命令被 ACL 拒成 'not allowed. Plugin not found'——其错误串与真正的未注册错误同含 'not found'，无负对照时测试会绿着什么都没测 | open |  | 2026-07-29T00:42:43.308Z |  |
 
 ````json
 [
@@ -55,6 +56,18 @@ last_updated: 2026-07-29T00:24:01.614Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-29T00:24:01.614Z",
+    "resolved_at": null
+  },
+  {
+    "id": 4,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "src-tauri/tests/ipc.rs",
+    "line": null,
+    "description": "研究文档示例的 ipc 请求 URL (http://tauri.localhost) 在 macOS 上非本地来源，会让每个命令被 ACL 拒成 'not allowed. Plugin not found'——其错误串与真正的未注册错误同含 'not found'，无负对照时测试会绿着什么都没测",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T00:42:43.308Z",
     "resolved_at": null
   }
 ]

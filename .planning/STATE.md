@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-07-PLAN.md
-last_updated: "2026-07-29T00:24:14.175Z"
+stopped_at: Completed 01-08-PLAN.md
+last_updated: "2026-07-29T00:42:57.812Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 8 of 9
+Plan: 9 of 9
 Status: Ready to execute
 Last activity: 2026-07-28 — Phase 01 execution started
 
-Progress: [████████░░] 78%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [████████░░] 78%
 | Phase 01 P05 | 38min | 2 tasks | 7 files |
 | Phase 01 P06 | 26min | 2 tasks | 10 files |
 | Phase 01 P07 | 31min | 2 tasks | 9 files |
+| Phase 01 P08 | 11min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-07: 端到端注入测试的判别性不能落在「响应里有空集」上——Phase 1 的 list_feedback 返回空 vec，空结果与「handler 根本没调注入 trait」不可区分；改落在 engine 自己写的校验文本上（并实测确认 rmcp 对该参数无兜底校验）
 - [Phase ?]: 01-07: 等事件的测试一律包 timeout，且前置条件断言要移出判别性测试——前者防「反证挂住而非变红」，后者防「反证落在前置条件上而非被守的那条断言上」
 - [Phase ?]: 01-07: facade 方法一律同步（spawn_blocking 归调用方）：改成 async fn 会废掉 std::sync::MutexGuard !Send 对「跨 await 持写锁」的编译期保护
+- [Phase ?]: 01-08: ipc 进程内测试的来源 URL 必须等于 tauri.conf.json 的 devUrl —— http://tauri.localhost 是 Windows 形态，macOS 下 is_local=false 会让每个命令被 ACL 拒成 'not allowed. Plugin not found'（与未注册错误同含 not found）
+- [Phase ?]: 01-08: check-deps.sh 补第六条 shell-egress（src-tauri 不得直接依赖 prism-llm），形态同 facade-egress；反证证明原五条对该缺口全部不敏感
+- [Phase ?]: 01-08: 有序性断言用序列比较而非集合比较；命令注册断言必须配未注册命令的负对照 + 断言 Ok（而非仅'错误不像未注册'）
 
 ### Pending Todos
 
@@ -116,6 +120,7 @@ None yet.
 - [数据勘误]: REQUIREMENTS.md 原 Coverage 写 51 条，实际 v1 REQ-ID 为 61 条，已于 roadmap 创建时更正
 - [每个 plan 执行时]: 反证本身需要被验证（01-03 后第三次出现）：01-05 的计划反证 C 实跑不成立，暴露了 LIKE 分支缺阴性对照；触发器 DELETE 路径的验证按计划写法恒真（JOIN 掩盖了陈旧索引条目）；01-06 的两条计划反证（从 build_router 摘掉 Host / Origin 中间件）实跑**全绿**——rmcp SDK 自带的 allowlist 替它拒掉了。跑反证时要看**落点**（红在哪一条断言）而非只看红绿；当被测层之上还有第三方兜底时，反证必须把被测层放进一个**没有兜底**的最小链路里（01-06 的 sentinel-router 隔离测试即此形态）。
 - [Phase 6 计划时]: rmcp SDK 的 Host 拒绝响应体为 "Forbidden: Host header is not allowed"，与本项目 T-01-29 的无差别拒绝口径不一致。当前应用层在外先拒使其不可达，但若 Phase 6 调整中间件顺序或 allowlist 使两者不再等价，SDK 的正文会泄漏落点
+- [01-09 / Phase 2+]: 若将来给项目加 capabilities/ 目录，has_app_acl_manifest 变 true，即使本地来源也会走 ACL —— src-tauri/tests/ipc.rs 届时需加一份测试用 capability，否则集体变红
 
 ## Deferred Items
 
@@ -127,6 +132,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T00:24:14.168Z
-Stopped at: Completed 01-07-PLAN.md
+Last session: 2026-07-29T00:42:48.539Z
+Stopped at: Completed 01-08-PLAN.md
 Resume file: None
