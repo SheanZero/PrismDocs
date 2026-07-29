@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-21-PLAN.md
-last_updated: "2026-07-29T12:59:37.183Z"
+stopped_at: Completed 01-22-PLAN.md
+last_updated: "2026-07-29T13:10:00.816Z"
 last_activity: 2026-07-29
 last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 19
+  completed_plans: 20
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 19 of 28（01-01..01-16 已执行；下一份 01-17）
+Plan: 20 of 28（01-01..01-16 已执行；下一份 01-17）
 Status: Ready to execute
 Last activity: 2026-07-29 — 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 
-Progress: [███████░░░] 68%
+Progress: [███████░░░] 71%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -85,6 +85,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P18 | 15min | 3 tasks | 2 files |
 | Phase 01 P20 | ~20min | 2 tasks | 2 files |
 | Phase 01 P21 | ~40min | 3 tasks | 3 files |
+| Phase 01 P22 | ~25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-21: #[serial] 只挡并发挡不住顺序 —— 依赖「我是第一个」的断言必须按前置状态参数化，标 serial 不够（实测 5/5 红）
 - [Phase ?]: 01-21: has_been_set() 被 with_default 的线程局部 dispatcher 永久置真，不能用它证明全局 subscriber 装上了
 - [Phase ?]: 01-21: 源码序断言的锚点须跨行 —— 单行锚点会先命中测试自己的字符串字面量，使 expect 在实现缺失时仍走过
+- [Phase ?]: 冒烟流上界夹紧点放在不依赖 tauri 的 smoke::generate 内部（经 clamp_total），命令层只在文档注释里指向它——两处各夹一次会让「哪一个承重」含糊
+- [Phase ?]: 「上界必须高于冒烟页默认值」写成 const _: () = assert!(...) 编译期断言而非单测：clippy assertions_on_constants 拒绝常量间的运行期 assert，且编译期形态更强
+- [Phase ?]: spawn_blocking 落点用函数体切片型源码断言而非 Handle::try_current() 行为探针：探针答案取决于 tauri::async_runtime 的后端实现，钉住它等于埋一颗随上游升级而红的雷
 
 ### Pending Todos
 
@@ -204,6 +208,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T12:59:28.904Z
-Stopped at: Completed 01-21-PLAN.md
+Last session: 2026-07-29T13:10:00.806Z
+Stopped at: Completed 01-22-PLAN.md
 Resume file: None

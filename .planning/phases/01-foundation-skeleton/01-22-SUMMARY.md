@@ -211,3 +211,7 @@ Tests  1 failed | 10 passed (11)
 ## Threat Flags
 
 无。本 plan 未引入新的网络端点、认证路径、文件访问模式或信任边界处的 schema 变更；`threat_model` 里 T-01G-27 / 28 / 29 / 30 四条 `mitigate` 全部落地，T-01-SC（依赖安装）保持 accept——未新增任何依赖。
+
+## Self-Check: PASSED
+
+四个源文件与 SUMMARY 均在磁盘上；五个提交（`116e860` / `f51f116` / `d0fb6a2` / `baee043` / `944ce3b`）均在 git 历史中。
