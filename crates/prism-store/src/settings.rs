@@ -43,6 +43,10 @@ pub fn is_secret_like_key(key: &str) -> bool {
 
 /// 解析并校验 LLM 端点。
 ///
+/// 拒绝四类：不被允许的 scheme、空 host、userinfo 里的凭据、query 或 fragment。
+/// 后两类是**值侧**守卫：[`is_secret_like_key`] 防的是键名，而 `llm.base_url`
+/// 这个键名完全正常，凭据藏在值里（01-VERIFICATION.md gap 1）。
+///
 /// 错误里只有键名与规则，**没有传入的 value**——被误填进这里的很可能正是一个 API key，
 /// 而错误消息会一路冒泡到日志与前端（T-01-26）。
 pub fn validate_base_url(raw: &str) -> Result<Url, StoreError> {
@@ -56,6 +60,23 @@ pub fn validate_base_url(raw: &str) -> Result<Url, StoreError> {
     }
     if url.host_str().is_none_or(str::is_empty) {
         return Err(StoreError::InvalidUrl("host must not be empty".into()));
+    }
+    // 密钥容器的边界建在**值**上，不只建在键名上：`llm.base_url` 这个键名再正常不过，
+    // `is_secret_like_key` 对 `https://user:key@host/v1` 完全看不见，而这行值会随
+    // sidecar 目录整体备份离开本机（docs/keychain-naming.md 不变量 1）。
+    // 两个条件都要：`https://user@host/v1` 里 `password()` 是 `None`，只看 password 会漏。
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(StoreError::InvalidUrl(
+            "must not carry credentials in the userinfo component".into(),
+        ));
+    }
+    // 同一个洞的另一面：部分 OpenAI 兼容网关用 `?api-key=…` 形态传凭据。
+    // 而 base_url 本身没有携带 query 或 fragment 的正当用途——真正的 query
+    // 由 Phase 4 发请求时自己拼。
+    if url.query().is_some() || url.fragment().is_some() {
+        return Err(StoreError::InvalidUrl(
+            "must not carry a query string or fragment".into(),
+        ));
     }
 
     // 自建内网端点是合法场景，所以只警告不阻断；真正发出请求时在 Phase 4 复核。
@@ -83,8 +104,10 @@ pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>, Store
 
 /// 写一条配置（同 key 覆盖）。
 ///
-/// 两道守卫都长在这里而不是调用方：疑似密钥的键名一律拒绝，`base_url` 一律先过 scheme 校验。
-/// 放在调用方就等于「每个调用点都记得」，那是约定；放在这里它才是机制。
+/// 两道守卫都长在这里而不是调用方：疑似密钥的**键名**一律拒绝，`base_url` 的**值**
+/// 一律先过 [`validate_base_url`]（scheme / host / userinfo / query / fragment 四类）。
+/// 放在调用方就等于「每个调用点都记得」，那是约定；放在这里它才是机制——
+/// 绕过界面直接 invoke 也改变不了结果。
 pub fn set_setting(tx: &Transaction, key: &str, value: &str) -> Result<(), StoreError> {
     if is_secret_like_key(key) {
         return Err(StoreError::InvalidSetting(format!(
