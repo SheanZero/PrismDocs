@@ -241,6 +241,18 @@ mod tests {
         }
     }
 
+    /// 此刻眼前这个 dispatcher 是不是一个**真的** subscriber。
+    ///
+    /// 不能用 `has_been_set()` 代替：那个标志由 `set_global_default` 与
+    /// `with_default` 共同置真，且**永不复位**——本文件那条捕获日志的测试用
+    /// `with_default` 装过一个线程局部的 subscriber，此后 `has_been_set()` 恒为真，
+    /// 哪怕全局槽位仍然空着。
+    fn a_real_subscriber_is_in_place() -> bool {
+        tracing::dispatcher::get_default(|dispatch| {
+            !dispatch.is::<tracing::subscriber::NoSubscriber>()
+        })
+    }
+
     /// 直接问 filter：这条 metadata 放不放行。不经全局 dispatcher，见 `log_filter_probe!`。
     fn probe(filter: tracing_subscriber::EnvFilter, meta: &tracing::Metadata<'static>) -> bool {
         use tracing::Subscriber as _;
@@ -382,16 +394,46 @@ mod tests {
     /// 刻意**不写**「调用前 `has_been_set()` 为 false」这条前置断言——全局 dispatcher 是
     /// 进程级的，把前置条件写进判别性测试会让反证落在前置条件上而不是被守的那条断言上
     /// （本 phase 已记录的教训）。
+    ///
+    /// 同一条推理的另一半（IN-02）：断言 ① 原先写作「首次调用返回 true」，那本身就是
+    /// 一条**隐式**前置条件——「本二进制里我是第一个装 subscriber 的」。它今天成立只因为
+    /// 恰好没有第二处装；有人为了断言日志输出加一处，① 就开始指着错误的代码变红。
+    ///
+    /// 收口分两步，缺一不可（执行本 plan 时实测过）：
+    ///
+    /// 1. `#[serial]` 只挡**并发**，挡不住**顺序**。实测：在本文件加一条名字排在前面、
+    ///    第一行调 `init_tracing()` 的测试，无论它标不标 `#[serial]`，原来的 ① 都是
+    ///    `--test-threads=4` 下连跑五次五次全红——因为那条测试先跑完就把 dispatcher 装上了。
+    /// 2. 所以 ① 改成按「调用前是否已就位」参数化：`init_tracing()` 的返回值必须报告
+    ///    **这次**装没装上，而不是一个常量。这条不依赖调用顺序，判别力也没丢——桩实现
+    ///    （恒返回 true 或恒返回 false）在两种世界里各有一种会被它逮住，② ③ 兜住其余。
+    ///
+    /// `#[serial]` 仍然要留：`has_been_set()` 与紧随其后的 `init_tracing()` 之间有一个
+    /// 读-改窗口，而 Task 1 那四条 filter 测试还会改 `RUST_LOG`——`init_tracing()` 读它。
+    /// **约定**：本 crate 里任何会装 subscriber 或改 `RUST_LOG` 的测试都必须进这个串行组。
     #[test]
+    #[serial]
     fn tracing_init_installs_a_global_subscriber_and_is_idempotent() {
-        // ① 本次调用完成了安装
-        assert!(init_tracing(), "the first init_tracing() should install");
+        // ① 返回值报告的是「本次调用装没装上」，不是一个常量
+        let was_installed_before = a_real_subscriber_is_in_place();
+        assert_eq!(
+            init_tracing(),
+            !was_installed_before,
+            "init_tracing() 的返回值与「调用前全局 dispatcher 是否已就位」不一致"
+        );
 
         // ② 判别性所在：若 init_tracing 被写成什么都不做的桩，① 仍可能绿而这条一定红
         assert!(
             tracing::dispatcher::has_been_set(),
             "no global dispatcher after init_tracing() — the 7 tracing call sites \
              across the workspace are still writing into a null sink"
+        );
+
+        // ②′ `has_been_set()` 单独已不足以支撑 ② 想说的那件事——见
+        // `a_real_subscriber_is_in_place` 的注释。补这一句把 ② 拉回原本的强度。
+        assert!(
+            a_real_subscriber_is_in_place(),
+            "the global dispatcher is still NoSubscriber after init_tracing()"
         );
 
         // ③ 重复调用安全：用 try_init 而非会 panic 的 init
