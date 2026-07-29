@@ -25,9 +25,21 @@ pub enum StoreError {
     #[error("schema migration failed: {0}")]
     Migration(#[from] rusqlite_migration::Error),
 
-    /// bundled SQLite 低于 `MIN_SQLITE`。只带版本串。
+    /// bundled SQLite 低于 `MIN_SQLITE`，或版本串畸形到无法证明它够新。只带版本串。
     #[error("bundled sqlite is too old: {0}")]
     SqliteTooOld(String),
+
+    /// `PRAGMA journal_mode=WAL` 拿回来的不是 wal。
+    ///
+    /// SQLite 用**返回行**而不是错误告知结果模式：WAL 起不来时（网络卷、只读目录、
+    /// `-shm` 建不出来）它返回 `delete`，语句本身是成功的。只带模式串——库路径是内部事实
+    /// （T-01-20）。
+    ///
+    /// 这个变体**不需要**新的 IPC 短码：它落在 `EngineError::Store(_)` 的兜底臂上
+    /// （`src-tauri/src/commands.rs::map_err` → `"store_error"`）。理由与 01-10 记录的决策同源
+    /// ——拒绝面扩张时优先复用既有短码，加短码要连带改 IPC 契约与前端 `ERROR_COPY`。
+    #[error("database is not in wal mode: {0}")]
+    JournalModeNotWal(String),
 
     /// 写入 `settings` 的键名不被接受（当前唯一的拒绝理由是「疑似密钥」）。
     /// 消息只带键名与规则，**不带 value**——被误填进来的很可能就是密钥本身（T-01-26）。

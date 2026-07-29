@@ -5,8 +5,9 @@
 //! 顺序是有语义的，不能并行、不能颠倒：
 //!
 //! 1. 建目录，**先**开 writer（读写 flags），由它创建库文件
-//! 2. writer 上设 `journal_mode=WAL`（**持久设置**，随库文件走，只需设一次）
-//! 3. 同批设每连接设置：`busy_timeout` / `synchronous` / `foreign_keys`
+//! 2. writer 上设 `journal_mode=WAL`（**持久设置**，随库文件走，只需设一次），
+//!    并**读回它的返回行校验**——只设一次的东西更要验一次
+//! 3. 再一批设每连接设置：`busy_timeout` / `synchronous` / `foreign_keys`
 //! 4. 校验 SQLite 版本，然后在**裸 Connection**上跑迁移（`to_latest` 要 `&mut`）
 //! 5. 迁移完成**之后**才建只读池
 //! 6. `close()` 时在 writer 上做 TRUNCATE checkpoint
@@ -48,12 +49,20 @@ pub fn open(db_path: &Path) -> Result<Store, StoreError> {
         std::fs::create_dir_all(dir)?;
     }
 
-    // 1–3. writer 先行。journal_mode 返回一行结果，因此必须走 execute_batch——
-    // Connection::execute 遇到返回行会报 ExecuteReturnedResults。
+    // 1–2. writer 先行。journal_mode 单独走 query_row：它那一行返回值**就是**结果模式，
+    //      而不是执行回执。WAL 起不来时（网络卷、只读目录、`-shm` 建不出来）SQLite 返回
+    //      `delete` 且不报错——不读这一行，整个 crate 的并发语义就静默降级成 rollback
+    //      journal，并在 Phase 2+ 表现为 5 秒 busy_timeout 下的偶发 SQLITE_BUSY。
+    //      大小写不作保证，因此用 eq_ignore_ascii_case 比。
     let mut writer = Connection::open(db_path)?;
+    let mode: String = writer.query_row("PRAGMA journal_mode=WAL", [], |r| r.get(0))?;
+    if !mode.eq_ignore_ascii_case("wal") {
+        return Err(StoreError::JournalModeNotWal(mode));
+    }
+
+    // 3. 余下三条是每连接设置，没有返回行，照旧一批设完。
     writer.execute_batch(&format!(
-        "PRAGMA journal_mode=WAL;\
-         PRAGMA synchronous=NORMAL;\
+        "PRAGMA synchronous=NORMAL;\
          PRAGMA busy_timeout={BUSY_TIMEOUT_MS};\
          PRAGMA foreign_keys=ON;"
     ))?;
@@ -155,15 +164,6 @@ impl Store {
 
 #[cfg(test)]
 mod tests {
-    /// 第 4 步（迁移）必须排在第 5 步（建池）之前。
-    ///
-    /// 这条断言看的是源码顺序，不是行为——因为**行为测不出来**：实测把建池挪到迁移之前，
-    /// `tests/concurrency.rs` 的六个测试全绿（同一个库文件路径下，池连接会在迁移提交后
-    /// 重读 schema cookie，于是照样看得见新表）。也就是说 `reader_sees_migrated_schema`
-    /// 守的是「迁移到底跑没跑」（去掉 `to_latest` 它立刻变红），守不住「跑在建池之前」。
-    ///
-    /// 顺序本身仍然重要：它是 writer-first 序列里唯一没有运行期兜底的一步。既然没有
-    /// 行为面的哨兵，就在这里放一个结构面的。
     /// WAL 是这个 crate 每一条并发性质的前提，而 SQLite 用**返回行**而不是错误告知结果模式：
     /// WAL 起不来时它返回 `delete`，`execute_batch` 照样报告成功。这条守的是「open() 之后
     /// 库确实处在 WAL 下」。
@@ -195,6 +195,15 @@ mod tests {
         );
     }
 
+    /// 第 4 步（迁移）必须排在第 5 步（建池）之前。
+    ///
+    /// 这条断言看的是源码顺序，不是行为——因为**行为测不出来**：实测把建池挪到迁移之前，
+    /// `tests/concurrency.rs` 的六个测试全绿（同一个库文件路径下，池连接会在迁移提交后
+    /// 重读 schema cookie，于是照样看得见新表）。也就是说 `reader_sees_migrated_schema`
+    /// 守的是「迁移到底跑没跑」（去掉 `to_latest` 它立刻变红），守不住「跑在建池之前」。
+    ///
+    /// 顺序本身仍然重要：它是 writer-first 序列里唯一没有运行期兜底的一步。既然没有
+    /// 行为面的哨兵，就在这里放一个结构面的。
     #[test]
     fn migration_runs_before_the_read_pool_is_built() {
         let source = include_str!("open.rs");
