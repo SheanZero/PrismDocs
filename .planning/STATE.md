@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-11-PLAN.md（gap 2 关闭：扫描器失明修复 + selftest 自证）
-last_updated: "2026-07-29T04:11:37.413Z"
+stopped_at: Completed 01-13-PLAN.md（gap 3 关闭：WebView CSP + 资源协议关闭 + tracing subscriber 落地）
+last_updated: "2026-07-29T05:34:30.733Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 12 of 13
+Plan: 12 of 13（13 已完成，12 尚未执行——本 phase 唯一剩余的 plan）
 Status: Ready to execute
 Last activity: 2026-07-29 — Phase 01 execution started
 
-Progress: [█████████░] 85%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Progress: [█████████░] 85%
 | Phase 01 P09 | 81min | 3 tasks | 19 files |
 | Phase 01 P10 | 10min | 2 tasks | 4 files |
 | Phase 01 P11 | 15min | 2 tasks | 5 files |
+| Phase 01 P13 | 14min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,14 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-11: fixture 撞上扫描器时改 fixture 不改防线（放宽正则 / 加 allowlist / 加整目录排除 / 降阈值四者都算放宽）。两处新命中以改名解决（secret→fixture_bearer、token→configured），allowlist 零新增
 - [Phase ?]: 01-11: 闸门在 justfile 与 CI 两处都显式写 all 而非靠无参数默认值——默认值哪天改回 scan-only，CI 会静默失去 selftest 那一半并照常绿；all 的顺序是 selftest 先、scan 后（先红的应当是原因而不是后果）
 - [Phase ?]: 01-11: INFRA-03 仍不勾——证据侧（静态扫描能看见明文密钥）与写入侧（01-10）两半均已关闭，但需求文本的「支持 Anthropic/OpenAI 兼容端点」半句要到 Phase 4 才有 chat client（沿用 01-09/01-10 同一判据）
+- [Phase ?]: 01-13: CSP 做成 csp / devCsp 两份——两处放宽（script-src 的 'unsafe-inline'、connect-src 的 Vite HMR 来源）只进 dev 那一份，发布形态一个字不改。Tauri v2 在 devCsp 缺席时退回用 csp，所以这一份不是可选项
+- [Phase ?]: 01-13: assetProtocol 的配置侧与 cargo protocol-asset feature 是配套的两半，只关一半等于没关；cargo build 移除 feature 后仍绿即为「无代码路径依赖资源协议」的证明。csp 刻意不含 asset:
+- [Phase ?]: 01-13: init_tracing 用 try_init 而非 init（后者在 dispatcher 已就位时 panic，「装日志把应用弄崩」是最不该发生的失败模式）；返回 bool 区分「这次装上了」与「早就装好了」；返回值在 run() 显式丢弃，与钥匙串失败不阻断启动同口径
+- [Phase ?]: 01-13: 默认档取 info 而非 01-REVIEW 建议的 info,prism_mcp=debug——核对 middleware.rs 后确认 deny 的 reason 是编译期常量且为 warn!，info 已覆盖。少开一个 target 的 debug 就少一份「日志里会出现什么」的不确定性（T-01-58：sink 本身是新增外泄面）
+- [Phase ?]: 01-13: 源码序断言的锚点必须取完整语句而非裸名字——include_str! 的匹配面同时含代码与注释，一条提到 tauri::Builder 的解释性注释就让断言在实现正确时变红（实测撞上）。这是 open.rs 范式的补充；失败方向是假红（安全）而非静默恒绿
+- [Phase ?]: 01-13: subscriber-free 受检集合用 TAURI_FREE_CRATES（含 prism-cli，将来 externalBin 单独公证）且只看 --edges normal（dev-deps 里装 subscriber 合理）；反证必须注入 [dependencies] 而非 [dev-dependencies]，否则反证成功地什么都没证明
+- [Phase ?]: 01-13: 不给 subscriber-free 加 justfile recipe 与 CI 步骤——它已纳入 all，而两处调用点跑的都是 check-deps.sh all，零调用点改动即成为闸门；同时避开与 01-11 的文件冲突。这是决定不是遗漏
+- [Phase ?]: 01-13: 包合法性闸门不可自动放行（即使 auto_advance 为真）——缺失的审计行是执行器无法自行确立的事实，不是人可以橡皮图章的验证步骤。tracing-subscriber 已人工核对（tokio-rs/tracing 同仓库、2019 首发、~523M 下载、MIT、0.3.23）并写回 RESEARCH 审计表
 
 ### Pending Todos
 
@@ -142,6 +151,7 @@ None yet.
 - [Phase 2+ 每次写前端交互测试]: 单测会替被测系统假设掉前置条件——jsdom 替用户完成「输入 hash」（01-09 缺陷 1：冒烟页在真实窗口不可达而路由断言全绿）、mock 替运行时完成「ACL 放行」（01-09 缺陷 2）。两者的症状都是「什么都没发生，也没有报错」。这是 01-06 / 01-08 那族问题的第三、第四个变种，共同解药只有「把被测性质放进一个没有替身的链路里跑一次」
 - [Phase 4 前] INFRA-03 仍不勾：~~01-10 只关闭了写入侧（凭据型 base_url 不入库），静态扫描能否看见明文密钥由 01-11 关闭~~ — 两半均已关闭（01-10 写入侧 / 01-11 证据侧，扫描器对 01-VERIFICATION.md § SC-4 取样表命中率 1/5 → 5/5）。剩余阻塞只有需求文本的「支持 Anthropic/OpenAI 兼容端点」半句——要到 Phase 4 才有 chat client（沿用 01-09 的同一判据）
 - [Phase 2+ 每次新增 fixture / 测试局部变量]: 名字像密钥的标识符后跟一个引号串会被 `scripts/check-secrets.sh` 抓住，这是它该抓的形状。撞车时改 fixture 的名字或值，**不动扫描器**——放宽正则 / 加 allowlist / 加整目录排除 / 降长度阈值四者都算放宽。判断标准：若某个改动会让 selftest 的某条阴性样本被误命中、或某条阳性样本不再命中，那就是在放宽防线
+- [Phase 1 收尾人工验证]: 01-13 Task 1 的 <human-check> 五步未执行（human_verify_mode: end-of-phase）。CSP 只在真实 WebView 里生效，jsdom 与 cargo test 都看不见它——npm run tauri dev 非白屏 / 设置页完整 / 冒烟页三入口 / Console 无 CSP 违规 / tauri build 的 dmg 重复验证（发布形态走 csp 而非 devCsp，是验证严格那一份的唯一路径）。顺带确认 tracing sink 非空：base_url 设成非 loopback 的 http 端点，终端应出现 settings.rs 的明文 http 告警。出现违规时只放宽 devCsp 或按报告点名的指令逐项追加，禁止设回 null
 
 ## Deferred Items
 
@@ -153,6 +163,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T04:11:00.842Z
-Stopped at: Completed 01-11-PLAN.md（gap 2 关闭：扫描器失明修复 + selftest 自证）
+Last session: 2026-07-29T05:33:41.874Z
+Stopped at: Completed 01-13-PLAN.md（gap 3 关闭：WebView CSP + 资源协议关闭 + tracing subscriber 落地）
 Resume file: None

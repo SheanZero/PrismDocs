@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 7
+open_count: 9
 waived_count: 0
 fixed_count: 0
-total_count: 7
-last_updated: 2026-07-29T04:11:54.094Z
+total_count: 9
+last_updated: 2026-07-29T05:34:36.571Z
 ---
 
 # Broken Windows Ledger
@@ -22,6 +22,8 @@ last_updated: 2026-07-29T04:11:54.094Z
 | 5 | 01 | deviation | src/App.tsx |  | 冒烟页在真实 Tauri 窗口里不可达（窗口无地址栏，计划的「靠地址栏进入 #/dev」不可执行）；而「hash 是 #/dev 时渲染谁」的路由断言在冒烟页永远够不着的世界里同样全绿——路由正确性不蕴含可达性 | open |  | 2026-07-29T02:21:00.297Z |  |
 | 6 | 01 | deviation | src-tauri/capabilities/default.json |  | listen() 被 Tauri v2 ACL 拒绝且 rejection 被吞：capabilities/ 缺失时 ACL 集合编译成 {}；ACL 只管插件命令，generate_handler! 的自有命令不过 ACL——于是 invoke 全部正常、listen 从未注册、计数停在 0 且零报错。vitest 里 event 模块被 mock，这一整类失败在单测中结构上不可见 | open |  | 2026-07-29T02:21:00.347Z |  |
 | 7 | 01 | deviation | scripts/check-secrets.sh |  | INFRA-03 未勾：需求文本「支持 Anthropic/OpenAI 兼容端点」半句需 Phase 4 chat client；扫描器与写入侧两半已关闭 | open |  | 2026-07-29T04:11:54.094Z |  |
+| 8 | 01 | unrun-verify | src-tauri/tauri.conf.json |  | 01-13 Task 1 的 <human-check> 五步（真实 WebView + dmg 两形态的 CSP 验证）未执行，顺延至 end-of-phase 人工验证 | open |  | 2026-07-29T05:34:36.523Z |  |
+| 9 | 01 | unrun-verify | src-tauri/src/lib.rs |  | 01-13 Task 3 的行为断言未执行：tauri dev 终端是否真的打出 settings.rs 的明文 http 告警（sink 非空的端到端证据） | open |  | 2026-07-29T05:34:36.571Z |  |
 
 ````json
 [
@@ -107,6 +109,30 @@ last_updated: 2026-07-29T04:11:54.094Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-29T04:11:54.094Z",
+    "resolved_at": null
+  },
+  {
+    "id": 8,
+    "kind": "unrun-verify",
+    "phase": "01",
+    "file": "src-tauri/tauri.conf.json",
+    "line": null,
+    "description": "01-13 Task 1 的 <human-check> 五步（真实 WebView + dmg 两形态的 CSP 验证）未执行，顺延至 end-of-phase 人工验证",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T05:34:36.523Z",
+    "resolved_at": null
+  },
+  {
+    "id": 9,
+    "kind": "unrun-verify",
+    "phase": "01",
+    "file": "src-tauri/src/lib.rs",
+    "line": null,
+    "description": "01-13 Task 3 的行为断言未执行：tauri dev 终端是否真的打出 settings.rs 的明文 http 告警（sink 非空的端到端证据）",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T05:34:36.571Z",
     "resolved_at": null
   }
 ]
