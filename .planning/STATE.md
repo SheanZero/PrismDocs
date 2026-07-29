@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-13-PLAN.md（gap 3 关闭：WebView CSP + 资源协议关闭 + tracing subscriber 落地）
-last_updated: "2026-07-29T05:34:30.733Z"
+stopped_at: Completed 01-12-PLAN.md
+last_updated: "2026-07-29T05:45:09.509Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 12 of 13（13 已完成，12 尚未执行——本 phase 唯一剩余的 plan）
+Plan: 13 of 13（13 已完成，12 尚未执行——本 phase 唯一剩余的 plan）
 Status: Ready to execute
 Last activity: 2026-07-29 — Phase 01 execution started
 
-Progress: [█████████░] 92%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Progress: [█████████░] 92%
 | Phase 01 P10 | 10min | 2 tasks | 4 files |
 | Phase 01 P11 | 15min | 2 tasks | 5 files |
 | Phase 01 P13 | 14min | 3 tasks | 7 files |
+| Phase 01 P12 | 6min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,10 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-13: subscriber-free 受检集合用 TAURI_FREE_CRATES（含 prism-cli，将来 externalBin 单独公证）且只看 --edges normal（dev-deps 里装 subscriber 合理）；反证必须注入 [dependencies] 而非 [dev-dependencies]，否则反证成功地什么都没证明
 - [Phase ?]: 01-13: 不给 subscriber-free 加 justfile recipe 与 CI 步骤——它已纳入 all，而两处调用点跑的都是 check-deps.sh all，零调用点改动即成为闸门；同时避开与 01-11 的文件冲突。这是决定不是遗漏
 - [Phase ?]: 01-13: 包合法性闸门不可自动放行（即使 auto_advance 为真）——缺失的审计行是执行器无法自行确立的事实，不是人可以橡皮图章的验证步骤。tracing-subscriber 已人工核对（tokio-rs/tracing 同仓库、2019 首发、~523M 下载、MIT、0.3.23）并写回 RESEARCH 审计表
+- [Phase ?]: McpDeps::new 改为可失败构造：空/纯空白 bearer 在构造期即被拒（trim().is_empty()），McpDeps 一旦存在其 bearer 保证非空
+- [Phase ?]: McpError::EmptyBearer 文案零插值——Phase 6 被拒的值可能是真 token 的畸形前缀，错误只陈述规则不回显值（T-01-29 同源）
+- [Phase ?]: 比较层只加一条空 expected 早退，不做 WR-15 整体重写：绑定两件事会让「哪一层挡住了」的反证落点不再唯一
+- [Phase ?]: 被单测钉住的 fail-open 行为用反转断言而非删除断言修复——被删掉的形态就是没人看着的形态
 
 ### Pending Todos
 
@@ -152,6 +157,7 @@ None yet.
 - [Phase 4 前] INFRA-03 仍不勾：~~01-10 只关闭了写入侧（凭据型 base_url 不入库），静态扫描能否看见明文密钥由 01-11 关闭~~ — 两半均已关闭（01-10 写入侧 / 01-11 证据侧，扫描器对 01-VERIFICATION.md § SC-4 取样表命中率 1/5 → 5/5）。剩余阻塞只有需求文本的「支持 Anthropic/OpenAI 兼容端点」半句——要到 Phase 4 才有 chat client（沿用 01-09 的同一判据）
 - [Phase 2+ 每次新增 fixture / 测试局部变量]: 名字像密钥的标识符后跟一个引号串会被 `scripts/check-secrets.sh` 抓住，这是它该抓的形状。撞车时改 fixture 的名字或值，**不动扫描器**——放宽正则 / 加 allowlist / 加整目录排除 / 降长度阈值四者都算放宽。判断标准：若某个改动会让 selftest 的某条阴性样本被误命中、或某条阳性样本不再命中，那就是在放宽防线
 - [Phase 1 收尾人工验证]: 01-13 Task 1 的 <human-check> 五步未执行（human_verify_mode: end-of-phase）。CSP 只在真实 WebView 里生效，jsdom 与 cargo test 都看不见它——npm run tauri dev 非白屏 / 设置页完整 / 冒烟页三入口 / Console 无 CSP 违规 / tauri build 的 dmg 重复验证（发布形态走 csp 而非 devCsp，是验证严格那一份的唯一路径）。顺带确认 tracing sink 非空：base_url 设成非 loopback 的 http 端点，终端应出现 settings.rs 的明文 http 告警。出现违规时只放宽 devCsp 或按报告点名的指令逐项追加，禁止设回 null
+- Phase 6 注入 MCP bearer 时不得 unwrap McpDeps::new 的 Err：按 D-06 须降级为「MCP 服务不启动 + 一条 warn」，否则「token 没配」会从开着的门变成启动崩溃（T-01-54）
 
 ## Deferred Items
 
@@ -163,6 +169,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T05:33:41.874Z
-Stopped at: Completed 01-13-PLAN.md（gap 3 关闭：WebView CSP + 资源协议关闭 + tracing subscriber 落地）
+Last session: 2026-07-29T05:44:58.638Z
+Stopped at: Completed 01-12-PLAN.md
 Resume file: None
