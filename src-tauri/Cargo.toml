@@ -18,7 +18,9 @@ path = "src/main.rs"
 tauri-build = { workspace = true, features = [] }
 
 [dependencies]
-tauri = { workspace = true, features = ["protocol-asset"] }
+# `protocol-asset` 已移除：配置侧 `assetProtocol.enable` 与这个 feature 是配套的两半，
+# 只关一半等于没关。Phase 4/5 真要渲染本地图片时，两半一起打开并配一个具体的 scope。
+tauri = { workspace = true }
 prism-engine = { workspace = true }
 prism-types = { workspace = true }
 prism-store = { workspace = true }
