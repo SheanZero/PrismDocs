@@ -1,425 +1,340 @@
 ---
 phase: 01-foundation-skeleton
-reviewed: 2026-07-29T00:00:00Z
+reviewed: 2026-07-29T05:57:42Z
 depth: standard
-files_reviewed: 63
+scope: gap-closure plans 01-10 .. 01-13 (diff base c231656)
+files_reviewed: 17
 files_reviewed_list:
   - .github/workflows/ci.yml
-  - crates/prism-anchor/src/lib.rs
-  - crates/prism-cli/src/main.rs
-  - crates/prism-engine/Cargo.toml
-  - crates/prism-engine/src/bus.rs
-  - crates/prism-engine/src/error.rs
-  - crates/prism-engine/src/facade.rs
-  - crates/prism-engine/src/lib.rs
-  - crates/prism-engine/src/services.rs
   - crates/prism-engine/tests/facade.rs
-  - crates/prism-fs/src/lib.rs
-  - crates/prism-llm/Cargo.toml
-  - crates/prism-llm/src/lib.rs
-  - crates/prism-llm/src/secrets.rs
-  - crates/prism-mcp/Cargo.toml
   - crates/prism-mcp/src/deps.rs
-  - crates/prism-mcp/src/handler.rs
   - crates/prism-mcp/src/lib.rs
   - crates/prism-mcp/src/middleware.rs
-  - crates/prism-mcp/src/server.rs
   - crates/prism-mcp/tests/middleware_gate.rs
   - crates/prism-mcp/tests/trait_injection.rs
-  - crates/prism-parse/src/lib.rs
-  - crates/prism-store/Cargo.toml
-  - crates/prism-store/migrations/001_schema_v1.sql
-  - crates/prism-store/src/error.rs
-  - crates/prism-store/src/lib.rs
-  - crates/prism-store/src/migrations.rs
-  - crates/prism-store/src/open.rs
-  - crates/prism-store/src/search.rs
-  - crates/prism-store/src/seed.rs
   - crates/prism-store/src/settings.rs
-  - crates/prism-store/tests/concurrency.rs
-  - crates/prism-store/tests/fts_cjk.rs
-  - crates/prism-types/Cargo.toml
-  - crates/prism-types/src/dto.rs
-  - crates/prism-types/src/event.rs
-  - crates/prism-types/src/lib.rs
-  - crates/prism-types/src/service.rs
-  - crates/prism-types/tests/contract.rs
-  - docs/keychain-naming.md
   - scripts/check-deps.sh
   - scripts/check-secrets.sh
   - src-tauri/Cargo.toml
-  - src-tauri/capabilities/default.json
-  - src-tauri/src/bus_adapter.rs
-  - src-tauri/src/commands.rs
   - src-tauri/src/lib.rs
-  - src-tauri/src/smoke.rs
   - src-tauri/tauri.conf.json
-  - src-tauri/tests/ipc.rs
-  - src/App.test.tsx
-  - src/App.tsx
-  - src/lib/capabilities.test.ts
   - src/lib/ipc.ts
-  - src/lib/queryClient.ts
-  - src/lib/useEngineInvalidation.test.ts
-  - src/lib/useEngineInvalidation.ts
-  - src/main.tsx
-  - src/pages/DevSmoke.test.tsx
-  - src/pages/DevSmoke.tsx
+  - src/lib/tauri-security.test.ts
   - src/pages/Settings.test.tsx
   - src/pages/Settings.tsx
 findings:
-  critical: 3
-  warning: 16
-  info: 6
-  total: 25
+  critical: 1
+  warning: 11
+  info: 4
+  total: 16
 status: issues_found
 ---
 
-# Phase 1: Code Review Report
+# Phase 01 (gap closure): Code Review Report
 
-**Reviewed:** 2026-07-29
+**Reviewed:** 2026-07-29T05:57:42Z
 **Depth:** standard
-**Files Reviewed:** 63
+**Files Reviewed:** 17
 **Status:** issues_found
 
 ## Summary
 
-The architectural invariants this phase set out to establish do hold. I independently
-re-derived the ones that mattered rather than trusting the prose: the dependency
-direction is genuinely acyclic, `prism-types` really is serde+thiserror only, the FTS
-index is trigger-driven with no manual `INSERT INTO documents_fts` anywhere in Rust,
-and the three MCP gates each have an isolation counter-proof whose failure point is
-unique. The `documents.rowid_pk` / `content_rowid` pairing and the `VACUUM` regression
-test are correct and the reasoning behind them is sound. I also pulled the vendored
-rmcp 2.2 source to check a suspicion that the SDK's port-less `allowed_origins`
-entries would reject the app's real ported Origin — they don't
-(`origin_is_allowed` treats `a_port.is_none()` as "any port"), so that is a
-non-finding and the defence-in-depth layering is correctly configured.
+This is a re-review scoped to the four gap-closure plans (01-10 credential-bearing `base_url`, 01-11 secret-scanner blindness, 01-12 MCP bearer fail-closed, 01-13 WebView CSP + tracing subscriber), diffed against `c231656`. It replaces the earlier report at `4af393b`.
 
-What the phase did not get right clusters in three places.
+**Prior findings CR-02 and CR-03 are confirmed closed, with caveats:**
 
-**Secrets can still reach disk by a route the guard does not cover.** `settings` is
-protected against secret-shaped *key names* but not against secret-shaped *values*:
-`validate_base_url` happily accepts `https://user:sk-…@host/v1` and persists the
-credential in the SQLite file that `docs/keychain-naming.md` explicitly says gets
-carried away by whole-directory backups. The guard was built as "机制 not 约定" and
-then left with a hole exactly the size of the most common way a user pastes an
-OpenAI-compatible endpoint.
+- **CR-02 (missing CSP / open asset protocol) — closed at the config level, but its guard is weak.** `tauri.conf.json` now carries a real production CSP, a separate `devCsp`, and `assetProtocol.enable: false` with an empty scope; the matching `protocol-asset` cargo feature was removed from `src-tauri/Cargo.toml`, so both halves are genuinely closed. However the regression test meant to keep it that way (`src/lib/tauri-security.test.ts`) does not detect the three most likely weakenings — see **WR-01**. The CSP is also missing `form-action`, which has no `default-src` fallback — see **WR-02**.
+- **CR-03 (empty-bearer fail-open) — genuinely closed, in two independent layers.** `McpDeps::new` is now fallible and rejects empty/whitespace bearers; `constant_time_eq` independently returns `false` for an empty `expected`; both layers carry their own tests, and the previously fail-open assertion `constant_time_eq("", "")` was *reversed* rather than deleted. The comparison layer left unreachable code behind (**WR-05**) and the constructor's trim-check/store-untrimmed asymmetry is a new latent problem (**WR-06**), but the fail-open itself is gone.
 
-**The shell's security posture is weaker than the engine's.** CSP is switched off
-entirely, the asset protocol is enabled with no consumer, and four `dev_*` commands —
-including one that writes fixture rows into the user's real database — are registered
-unconditionally in the release `generate_handler!`. The frontend hides the dev *page*
-in production builds; it does not remove the *commands*. Separately, nothing in the
-workspace installs a `tracing` subscriber, so every `tracing::warn!` the security
-design relies on ("真实原因只进本地 tracing", T-01-29; the agent-receipt audit line,
-T-01-33) writes to nowhere.
+The single BLOCKER is not in product code — it is in the automated evidence. `scripts/check-secrets.sh` was widened for Anthropic-shaped keys, but its keyword branch still requires a **quoted** value, so the entire class of unquoted assignments (`.env`, YAML, TOML, shell, CI `env:` blocks) remains invisible. The selftest masks this: its only unquoted positive sample happens to match through the `sk-` branch instead. I verified nothing is currently hiding in that hole, so this is an evidence-soundness failure rather than a live leak — but success criterion 4's automated proof does not hold as written.
 
-**One test in the recurring vacuous-assertion class survived.**
-`reader_snapshot_is_isolated` asserts `after >= 1` on a counter that starts at 1 and
-only ever grows, so it holds for both possible outcomes; and its inline comment claims
-a snapshot isolation that `Store::read` does not actually provide (no explicit
-transaction is opened, so the second `query_row` runs in autocommit and gets a fresh
-snapshot). The test's real content is "the writer is not blocked", which is worth
-having — but that is not what its name, comment, or assertion say. Several smaller
-assertions in the same family are listed under Warnings.
+The recurring pattern across this batch is **correct guards protected by non-discriminating tests**: WR-01, WR-03 and WR-04 are all cases where the shipped code is right but the assertion would stay green through the exact regression it exists to catch.
 
-Findings below are ordered by severity, not by file.
+All 34 frontend tests pass; `cargo test -p prism-mcp -p prism-store` is green; `check-deps.sh all` and `check-secrets.sh all` both exit 0. Nothing below is a currently-failing test.
 
 ## Critical Issues
 
-### CR-01: `validate_base_url` lets a credential-bearing URL into the settings table
+### CR-01: `check-secrets.sh` keyword branch requires a quoted value — every unquoted assignment is invisible, and the selftest hides it
 
-**File:** `crates/prism-store/src/settings.rs:48-71` (guard), `crates/prism-store/src/settings.rs:88-104` (write path)
-
-**Issue:** `set_setting` enforces two rules — the key must not *look* like a secret,
-and `llm.base_url` must parse as an http/https URL with a non-empty host. Neither rule
-inspects the URL's userinfo component. `Url::parse("https://user:sk-abc123@api.vendor.com/v1")`
-yields scheme `https` and `host_str() == Some("api.vendor.com")`, so it passes both
-checks and the full string — password included — is written verbatim into
-`settings.value`.
-
-This defeats the invariant the module header and `docs/keychain-naming.md:41-45` both
-state as absolute: *密钥的唯一存放地是系统钥匙串；不进 SQLite（含 settings 表）*.
-The stated reason that invariant exists is that the sidecar directory is backed up as
-a unit, so one backup exfiltrates the credential — which is exactly what happens here.
-Embedding the key in the base URL is not exotic: several OpenAI-compatible proxies and
-gateways document precisely that form, and the Settings page's own front-end guard
-(`looksLikeHttpUrl`, `src/pages/Settings.tsx:17-20`) accepts it too.
-
-`is_secret_like_key` was deliberately written "宽进严出" for key names. The same
-posture is missing on the value side, where the consequence is worse.
-
-**Fix:** reject userinfo in `validate_base_url` (and keep the message value-free, per
-T-01-26):
-
-```rust
-if !url.username().is_empty() || url.password().is_some() {
-    return Err(StoreError::InvalidUrl(
-        "must not embed credentials; store the API key in the system keychain".into(),
-    ));
-}
-```
-
-Add the negative control to `settings_base_url_validation`, and a matching
-`invalid_url` copy path is already present in `ERROR_COPY`. Consider also rejecting a
-non-empty `url.query()` / fragment on the same grounds — some gateways accept
-`?api-key=…`.
-
----
-
-### CR-02: CSP is disabled and the asset protocol is enabled with no consumer
-
-**File:** `src-tauri/tauri.conf.json:20-26`
+**Classification:** BLOCKER
+**File:** `scripts/check-secrets.sh:52` (pattern), `scripts/check-secrets.sh:89-109` (selftest positives)
 
 **Issue:**
 
-```json
-"security": {
-  "csp": null,
-  "assetProtocol": { "enable": true, "scope": [] }
-}
+The keyword alternation is
+
+```
+(api[_-]?key|secret|token|password)[[:space:]]*[=:][[:space:]]*["'][^"']{8,}
 ```
 
-`"csp": null` means Tauri injects no Content-Security-Policy at all — the WebView will
-load and execute script from any origin, and inline script is unrestricted. That is
-the one control that turns "a string got into the DOM" from a full compromise into a
-rendering bug. This project's whole point is to render Markdown that an external
-coding agent wrote (Phase 3+), and Phase 6 puts an LLM in the loop; by then the
-absence of a CSP is not a hardening gap but the primary exploit path. The IPC surface
-that a successful injection would inherit is not small — see WR-07 — and the shipping
-target is already live (`bundle.active: true`, `targets: "dmg"`).
+The `["']` is mandatory. Any assignment whose value is **not quoted** cannot match this branch. That is the dominant form in exactly the file types the success criterion calls "配置": `.env`, YAML, TOML, `justfile`, shell scripts, GitHub Actions `env:` blocks.
 
-`assetProtocol.enable: true` compounds it: the `protocol-asset` Cargo feature is also
-enabled (`src-tauri/Cargo.toml:21`), yet nothing in the Phase 1 frontend calls
-`convertFileSrc` and the capability file grants no `asset:allow-read`. It is declared
-attack surface with zero consumers — the opposite of the least-privilege posture the
-capability file itself takes.
+Verified against the live pattern (extracted verbatim from line 52):
 
-**Fix:** set a restrictive policy now, while the frontend has no external assets and
-the cost is zero:
-
-```json
-"security": {
-  "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src 'self' ipc: http://ipc.localhost",
-  "assetProtocol": { "enable": false, "scope": [] }
-}
+```
+MISSED : ANTHROPIC_API_KEY=abcdefghijklmnopqrstuvwx
+MISSED : password=hunter2hunter2hunter
+MISSED : AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+MISSED : mcp_bearer_token: 0123456789abcdef0123456789abcdef
+MISSED : github_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz1234567890
+MISSED : xoxb-123456789012-1234567890123-abcdefghijklmnopqrstuvwx
+MISSED : AIzaSyA-abcdefghijklmnopqrstuvwxyz12345
+CAUGHT :   bearerToken = "0123456789abcdef0123456789abcdef"
 ```
 
-and drop `"protocol-asset"` from the `tauri` feature list until something actually
-needs it. Re-enable both with a real `scope` in the phase that introduces local image
-rendering. Pin the policy with a test in the same spirit as `capabilities.test.ts` so
-it cannot silently regress to `null`.
+Note the fourth line: `mcp_bearer_token: <32 hex>` is **this project's own second secret** (`docs/keychain-naming.md`; injected into `McpDeps` in Phase 6), in YAML/TOML form, and the scanner cannot see it.
 
----
+The selftest is what makes this dangerous rather than merely incomplete. Positive sample 3 (line 92) is
 
-### CR-03: the bearer gate fails open on an empty token, and a unit test codifies it
-
-**File:** `crates/prism-mcp/src/deps.rs:30-40`, `crates/prism-mcp/src/middleware.rs:143-162`, `crates/prism-mcp/src/middleware.rs:208`
-
-**Issue:** `McpDeps::new` accepts `impl Into<Arc<str>>` with no validation, so
-`McpDeps::new(feedback, comments, "")` constructs successfully. With an empty expected
-token, `constant_time_eq("", "")` returns `true` — and the test suite asserts that
-this is the intended behaviour (`middleware.rs:208`). The consequence is that a
-misconfigured or not-yet-provisioned install turns the third gate into "send
-`Authorization: Bearer ` with an empty token and you are through". Nothing anywhere
-errors, warns, or refuses to start.
-
-Phase 6 is where the CSPRNG token gets generated and read from the keychain
-(`deps.rs:12-15`), and that is precisely the code path where an empty value is
-plausible: a keychain read that returns an empty string, a first-run race before the
-token is written, a `unwrap_or_default()` at the call site. A security gate whose
-degraded mode is "allow everyone" and whose degraded mode is silent is a fail-open
-gate, regardless of how carefully the comparison itself is written.
-
-The rest of this middleware is defensive to a fault (constant-time comparison, a
-source-level sentinel forbidding `==`, uniform 403s). This one hole is out of
-character with all of it.
-
-**Fix:** make the constructor fallible, or refuse at the comparison:
-
-```rust
-impl McpDeps {
-    pub fn new(
-        feedback: Arc<dyn FeedbackSource>,
-        comments: Arc<dyn CommentSink>,
-        bearer: impl Into<Arc<str>>,
-    ) -> Result<Self, McpError> {
-        let bearer: Arc<str> = bearer.into();
-        if bearer.len() < MIN_BEARER_LEN {   // 32 hex chars minimum
-            return Err(McpError::WeakBearer);
-        }
-        Ok(Self { feedback, comments, bearer })
-    }
-}
+```bash
+positive+=("ANTHROPIC_API_KEY=${sk}${dash}ant-api03-xyz0123456789abcdefghij")
 ```
 
-and change `constant_time_eq` to return `false` unconditionally when `expected` is
-empty, replacing the `constant_time_eq("", "")` assertion with its inverse. Both
-changes are cheap now and expensive after Phase 6 wires the real token.
+— an unquoted env-style assignment. It passes, which *reads* as "unquoted assignments are covered." It is not: it matches through the `sk-[A-Za-z0-9_-]{20,}` branch. Strip the `sk-` prefix from that sample and it stops matching entirely. No sample anywhere in the selftest isolates the keyword branch against an unquoted value, so the file's own stated design goal ("正则的判别力从此是每次 CI 都重新证明一遍的断言") is not met for the branch that was just extended.
+
+This is the same failure shape the file's header documents as its reason for existing: the scanner is blind to a real supplier format, and nothing goes red.
+
+I confirmed with a broader sweep (`git grep -niE '(api[_-]?key|secret|token|password|bearer)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9_./+-]{12,}'` plus a ≥32-char base64/hex literal sweep) that **nothing is currently hiding in this hole** — the only hits are the intended `IN_QUERY` fixture and `Cargo.lock` checksums. So this is an evidence failure, not an active leak. But SC-4's automated proof does not establish what it claims.
+
+Secondary gaps in the same pattern, worth folding into one fix: `github_pat_` (fine-grained GitHub PATs), `xox[baprs]-` (Slack), `AIza` (Google) are all uncovered.
+
+**Fix:**
+
+Make the quote optional, add an unquoted value class, then add selftest samples that isolate the branch:
+
+```bash
+# 值可以带引号，也可以是裸值（.env / YAML / TOML / CI env: 的常态）
+UNQUOTED="[A-Za-z0-9_./+~-]{16,}"
+PATTERN="sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{16,}|AIza[A-Za-z0-9_-]{30,}|(api[_-]?key|secret|token|password)[[:space:]]*[=:][[:space:]]*(${QUOTE}${NOT_QUOTE}{8,}|${UNQUOTED})"
+```
+
+And, critically, positives that cannot match through any prefix branch:
+
+```bash
+# 必须由关键词分支命中：值里没有任何供应商前缀。
+# 删掉「引号可选」这半个改动 → 这两条立刻变红，而旧的 5 条取样不会。
+positive+=("MCP_BEARER_TOKEN=0123456789abcdef0123456789abcdef")
+positive+=("password: hunter2hunter2hunter2")
+```
+
+Then re-run `scan` and adjust any fixture that newly trips it — per the file's own one-way rule, change the fixture, never the pattern. Expect `crates/prism-store/src/settings.rs:246` (`IN_QUERY`'s `?api-key=prism-test-secret-value`) and its mirror at `scripts/check-secrets.sh:117` to need renaming, e.g. to a non-keyword query parameter name.
 
 ## Warnings
 
-### WR-01: `reader_snapshot_is_isolated` asserts a tautology and documents behaviour that does not exist
+### WR-01: The CSP regression test passes through `'unsafe-inline'`, an explicit remote script origin, and `connect-src *`
 
-**File:** `crates/prism-store/tests/concurrency.rs:43-68`
+**Classification:** WARNING
+**File:** `src/lib/tauri-security.test.ts:47-59`
 
-**Issue:** Two problems in one test.
+**Issue:** The test's stated purpose (lines 44-46) is to upgrade assertion ② "from 字面量在 to 面没被扩宽". It does not. The loop at 49-55 is a four-entry denylist (`*`, `http:`, `https:`, `data:`, `*.`-prefixed). Verified by replaying the exact assertion logic against weakened policies:
 
-The assertion `assert!(after >= 1, "读者不应因并发写而丢失可见行")` (line 68) cannot
-fail. `before` was already asserted to be 1, rows are only ever inserted, so `after` is
-1 or 2 and both satisfy `>= 1`. It is the "assertion that holds regardless of whether
-the code works" pattern verbatim.
-
-The comment it is guarding (line 49, *「写已经提交了；同一个读连接仍在自己的事务快照里」*)
-is also wrong. `Store::read` (`open.rs:131-137`) hands out a pooled `Connection` and
-calls the closure; it never opens an explicit transaction. Each `query_row` therefore
-runs in autocommit and acquires a fresh read snapshot, so the second read observes the
-committed row. The test's name promises snapshot isolation, its comment asserts
-snapshot isolation, and the code under test does not implement it — the weakened
-assertion is what keeps all three from colliding.
-
-What the test genuinely proves is valuable and unique: the writer commits while a
-reader holds a pooled connection, without `SQLITE_BUSY`. That deserves to be the
-test's stated purpose.
-
-**Fix:** rename to `writer_is_not_blocked_by_an_open_reader`, delete the misleading
-comment, and replace the tautology with the fact that actually holds:
-
-```rust
-assert_eq!(after, 2, "autocommit read should observe the committed row");
+```
+PASSES TEST | default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'
+PASSES TEST | default-src 'self'; script-src 'self' https://cdn.evil.example; object-src 'none'; base-uri 'self'
+PASSES TEST | default-src 'self'; script-src 'self'; connect-src *; object-src 'none'
 ```
 
-If snapshot isolation across a `read()` closure is a property the design wants, it has
-to be implemented first (`conn.unchecked_transaction()` with
-`TransactionBehavior::Deferred` held for the closure's duration) and only then
-asserted.
+All three green. `script-src 'self' 'unsafe-inline'` is the single most probable regression — it is what gets added when a CSP violation blocks something — and it fully reinstates the XSS path this test exists to close (Phase 3+ renders agent-authored Markdown). `connect-src *` is an unconstrained exfiltration channel and is not checked at all. The file's own argument ("一个把 `csp` 改回 `null` 的 diff 是一次代码评审最容易放过的形状") applies verbatim to a one-word `'unsafe-inline'` diff, which this test would wave through.
 
----
-
-### WR-02: `PRAGMA journal_mode=WAL` result is discarded — a silent fallback to rollback journal
-
-**File:** `crates/prism-store/src/open.rs:53-59`
-
-**Issue:** `journal_mode` is the one pragma in the six-step sequence that can *fail
-without erroring*. SQLite returns the resulting mode as a result row; if WAL cannot be
-enabled (database on a network filesystem, a `-shm` that cannot be created, a
-read-only directory), it returns `delete` and `execute_batch` reports success because
-no SQL error occurred.
-
-Every concurrency property this crate is built around — readers not blocking the
-writer, the read pool being useful at all, `close()`'s TRUNCATE checkpoint having
-anything to truncate — silently degrades to rollback-journal semantics, which surfaces
-in Phase 2+ as intermittent `SQLITE_BUSY` under the 5s `busy_timeout`. That is the
-hardest possible failure to trace back to here. The module header calls
-`journal_mode` a "持久设置，只需设一次"; that is exactly why it needs to be verified
-once.
-
-**Fix:** set it with `query_row` and check the answer before the rest of the batch:
-
-```rust
-let mode: String = writer.query_row("PRAGMA journal_mode=WAL", [], |r| r.get(0))?;
-if !mode.eq_ignore_ascii_case("wal") {
-    return Err(StoreError::JournalModeNotWal(mode)); // mode string only, no path (T-01-20)
-}
-writer.execute_batch(&format!(
-    "PRAGMA synchronous=NORMAL; PRAGMA busy_timeout={BUSY_TIMEOUT_MS}; PRAGMA foreign_keys=ON;"
-))?;
-```
-
----
-
-### WR-03: `close()` discards the checkpoint's busy flag
-
-**File:** `crates/prism-store/src/open.rs:147-153`
-
-**Issue:** The doc comment identifies the exact failure mode — *"TRUNCATE checkpoint
-在还有其他连接开着时会「成功但没做事」（返回 busy 标志而不是报错），那正是这类 bug
-静默的地方"* — and then the code reads the result with `|_| Ok(())`, throwing away the
-`busy` column it just described. Dropping the pool first makes the busy case unlikely,
-not impossible: an outstanding `PooledConnection` on another thread, or a reader still
-inside a `read()` closure at shutdown, reproduces it. The stated consequence (a backup
-that copies the main database while WAL content is still uncheckpointed) is a data
-integrity issue, and the only test coverage is `wal_truncated_on_close`, which runs
-with no concurrent readers.
-
-**Fix:** read column 0 and surface it:
-
-```rust
-let busy: i64 = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| r.get(0))?;
-if busy != 0 {
-    return Err(StoreError::CheckpointBusy);
-}
-```
-
----
-
-### WR-04: no `tracing` subscriber is ever installed — every log call in the workspace is a no-op
-
-**File:** `src-tauri/src/lib.rs:30-62` (no init), `crates/prism-mcp/src/middleware.rs:37`, `crates/prism-engine/src/services.rs:57-61`, `crates/prism-store/src/settings.rs:64-67`, `src-tauri/src/bus_adapter.rs:66-68`
-
-**Issue:** `tracing` is a dependency of six crates and `tracing-subscriber` is a
-dependency of none — `grep -rn "tracing_subscriber" crates src-tauri Cargo.toml`
-returns nothing, and neither `main.rs` nor `run()` installs a global default. Every
-`tracing::warn!` / `info!` / `trace!` in the workspace is discarded at runtime.
-
-That is not merely missing observability; three deliberate security decisions are
-built on top of a sink that does not exist:
-
-- `middleware.rs:36-39` — the uniform 403 is justified by *"真实原因只进本地 tracing，
-  不进响应"* (T-01-29). The real reason goes nowhere. An operator debugging a rejected
-  agent has no signal at all, which makes the uniform-403 design much more expensive
-  to live with than intended.
-- `services.rs:57-61` — the agent-receipt audit line (T-01-33) is the only record that
-  an external agent acted on a comment. It is not recorded.
-- `settings.rs:64-67` — the plaintext-http-to-a-non-loopback-host warning, described as
-  "只警告不阻断", neither warns nor blocks.
-- `lib.rs:40-42` — "keychain backend unavailable; secrets are disabled" is the sole
-  notification for a startup degradation the user is otherwise never told about.
-
-**Fix:** add `tracing-subscriber` to `src-tauri` and initialise it as the first
-statement of `run()`, before `tauri::Builder`:
-
-```rust
-tracing_subscriber::fmt()
-    .with_env_filter(
-        tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "info,prism_mcp=debug".into()),
-    )
-    .init();
-```
-
-Keep it in the shell only, so the engine crates stay subscriber-agnostic and testable.
-Note that `prism-mcp`'s deny reasons will then be written to a local log — confirm
-that is intended before enabling `debug` for that target by default.
-
----
-
-### WR-05: `errorCopy` resolves prototype-chain members and can return a function typed as `string`
-
-**File:** `src/lib/ipc.ts:41-68`
-
-**Issue:** `ERROR_COPY` is an object literal, so it inherits from `Object.prototype`,
-and the lookup uses `??` — which only falls back on `null`/`undefined`:
+**Fix:** Assert the allowlist, not a denylist, and cover the other load-bearing directives:
 
 ```ts
-return ERROR_COPY[code] ?? "操作失败，请重试。";
+// script-src 必须恰好是 'self' —— 任何新增来源都要在这条断言上过一次评审
+expect(directiveSources(csp, "script-src")).toEqual(["'self'"]);
+expect(csp).not.toContain("unsafe-eval");
+expect(csp).not.toContain("unsafe-inline"); // 发布形态一个都不许；放宽只允许发生在 devCsp
+expect(directiveSources(csp, "connect-src")).toEqual([
+  "'self'", "ipc:", "http://ipc.localhost",
+]);
+expect(directiveSources(csp, "object-src")).toEqual(["'none'"]);
+expect(directiveSources(csp, "base-uri")).toEqual(["'self'"]);
 ```
 
-`errorCopy("toString")`, `errorCopy("constructor")`, `errorCopy("valueOf")`,
-`errorCopy("hasOwnProperty")` all return a *function*, not the fallback string. The
-declared return type is `string`, so TypeScript will not catch it; the value flows
-into `setKeyNotice({ text })` / `setNotice(...)` and then into JSX, where React
-rejects a function child.
+### WR-02: Production CSP is missing `form-action`, which does not inherit from `default-src`
 
-Today's error codes are a closed set produced by `map_err`, so this is latent rather
-than live. But `errorCopy` is also invoked on arbitrary caught values in
-`DevSmoke.tsx:110/125/140/149` and on mutation rejections in `Settings.tsx`, and the
-whole point of the function's doc comment is that unknown input must land on the
-generic fallback rather than reaching the DOM. On these specific inputs it does the
-opposite.
+**Classification:** WARNING
+**File:** `src-tauri/tauri.conf.json:21` (and `:22` for `devCsp`)
 
-**Fix:** use a prototype-free container or an own-property check:
+**Issue:** `form-action` is one of the CSP directives with **no `default-src` fallback**. Under the current policy, an injected `<form action="https://evil.example" method="POST">` plus auto-submit is a working exfiltration channel even though `connect-src`, `img-src`, and `script-src` are all pinned to `'self'`. The threat this CSP was written for (Phase 3+ rendering Markdown authored by an external coding agent; Phase 6 putting an LLM in the loop) is precisely a content-injection threat, so closing the script and network paths while leaving the form path open is an incomplete boundary.
+
+**Fix:** Add to both `csp` and `devCsp`:
+
+```
+… object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+```
+
+and pin both in `tauri-security.test.ts` alongside the WR-01 assertions.
+
+### WR-03: The undifferentiated-403 contract (T-01-29) is never asserted against the router that ships, and the SDK layer beneath it violates it
+
+**Classification:** WARNING
+**File:** `crates/prism-mcp/tests/middleware_gate.rs:192-204, 425-449`; `crates/prism-mcp/src/server.rs:56-59`
+
+**Issue:** Two gaps that compound.
+
+1. `rejections_do_not_disclose_which_layer_denied` (line 425) runs against three **isolated sentinel routers**, never against `serve_loopback`. The A-group tests that do hit the real router assert only `is_client_error()` for the bearer cases (lines 192-204) — a regression to 401, 400, or 404 stays green, which is exactly the status-code differentiation T-01-29 forbids.
+
+2. `build_router` deliberately configures the rmcp SDK with the same allowlists (`with_allowed_hosts` / `with_allowed_origins`) for defense in depth. The SDK's rejections are **not** undifferentiated. From `rmcp-2.2.0/src/transport/streamable_http_server/tower.rs`:
+
+   - `forbidden_response("Forbidden: Host header is not allowed")` — 403 **with a body naming the layer**
+   - `forbidden_response("Forbidden: Origin header is not allowed")` — 403 with a distinguishing body
+   - `bad_request_response("Bad Request: Invalid Host header")` — **400**, with a body
+   - `bad_request_response("Bad Request: Invalid Origin header")` — **400**, with a body
+
+   These are reachable because the two layers parse differently: the app's `host_of` (`middleware.rs:42-61`) accepts anything before the first `:`, while the SDK uses the stricter `http::uri::Authority::try_from`. `Host: 127.0.0.1:notanumber` passes layer ① and draws a 400-with-body from the SDK.
+
+Reachability requires a valid bearer, so this is not an unauthenticated oracle — hence WARNING, not BLOCKER. But the documented property ("三层一律返回 403 且空正文") is false end-to-end, and no test would notice if it became false pre-authentication too.
+
+**Fix:** (a) tighten the A-group bearer assertions from `is_client_error()` to `assert_eq!(status, StatusCode::FORBIDDEN)` plus an empty-body check; (b) add one test that drives `serve_loopback` with a bad Host, a bad Origin, and a bad bearer and asserts the three responses are byte-identical; (c) either align `host_of` with `Authority::try_from` so the two layers agree, or amend the T-01-29 note in `middleware.rs:6-11` to state explicitly that the contract covers only the pre-authentication surface.
+
+### WR-04: `check_dup` reports OK and exits 0 when `cargo tree` fails
+
+**Classification:** WARNING
+**File:** `scripts/check-deps.sh:36`
+
+**Issue:** `out=$(cargo tree --workspace --duplicates --edges normal || true)` swallows a non-zero exit; `out` is then empty, `grep` finds nothing, and the function prints `OK: no duplicate rusqlite/reqwest/libsqlite3-sys` and returns 0. Verified with a stub `cargo` on `PATH`:
+
+```
+$ PATH=$stub:$PATH bash scripts/check-deps.sh dup
+error: failed to parse manifest
+OK: no duplicate rusqlite/reqwest/libsqlite3-sys
+exit=0
+```
+
+`check-secrets.sh:68-69` names this exact defect ("WR-11") in order to contrast it with its own load-bearing `|| true`, so it is a known, still-live fail-open in the evidence. In `all` mode a later check happens to abort the run, but a failure specific to `--duplicates` (a renamed flag in a future cargo, say) would silently retire the duplicate-SQLite assertion while still printing OK.
+
+**Fix:** Distinguish "command failed" from "no output":
+
+```bash
+check_dup() {
+  local out rc=0
+  out=$(cargo tree --workspace --duplicates --edges normal) || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "FAIL: cargo tree --duplicates could not run (exit $rc)" >&2
+    return 1
+  fi
+  if grep -Eq '^(rusqlite|reqwest|libsqlite3-sys) v' <<<"$out"; then
+    …
+  fi
+}
+```
+
+### WR-05: Unreachable branches and a misleading comment inside `constant_time_eq`
+
+**Classification:** WARNING
+**File:** `crates/prism-mcp/src/middleware.rs:150-173`
+
+**Issue:** After the early `if expected.is_empty() { return false; }` at line 151:
+
+- line 158's `expected.len().max(1)` can never take the `1` arm;
+- lines 163-168 are entirely dead — the comment "空 expected 时 folded 是长度 1 的哨兵，下面的 ct_eq 会与长度断言一起失败" describes a state the function cannot be in, and `padded` is unconditionally `&folded[..]`.
+
+In a function whose entire value is that a reader can verify it by inspection, dead code documenting a non-existent second empty-handling path is an active hazard: the next reader may delete the line-151 guard believing lines 163-168 cover the case. They do not — with line 151 removed, `expected.ct_eq(&folded[..0])` on two empty slices returns *true* and `same_len` also holds, so the empty-configured gate fails open again. That is the CR-03 regression, one deletion away, with a comment inviting it.
+
+(The XOR fold is also redundant given `same_len` is ANDed in at line 172, but that is defensible belt-and-braces; the dead branches are not.)
+
+**Fix:**
+
+```rust
+fn constant_time_eq(expected: &str, presented: &str) -> bool {
+    // CR-03 纵深第二层：配置为空的门禁不放行任何人。
+    // 这是本函数**唯一**的空值处理点——下面没有第二道，删掉这一行就是 fail-open。
+    if expected.is_empty() {
+        return false;
+    }
+    let expected = expected.as_bytes();
+    let presented = presented.as_bytes();
+
+    let mut folded = vec![0u8; expected.len()];
+    for (i, byte) in presented.iter().enumerate() {
+        folded[i % expected.len()] ^= byte;
+    }
+
+    let same_len = (expected.len() as u64).ct_eq(&(presented.len() as u64));
+    let same_bytes = expected.ct_eq(&folded);
+    (same_len & same_bytes).into()
+}
+```
+
+`the_comparison_is_not_a_plain_equality` (line 234) should gain a third assertion: `assert!(body.contains("expected.is_empty()"), "空配置的短路守卫被删掉了")`.
+
+### WR-06: `McpDeps::new` validates on `trim()` but stores the untrimmed value — a whitespace-padded bearer builds a gate nobody can open
+
+**Classification:** WARNING
+**File:** `crates/prism-mcp/src/deps.rs:51-59`
+
+**Issue:** The guard is `bearer.trim().is_empty()`, but the value stored is the original `bearer`. So `McpDeps::new(.., "0123abcd\n")` succeeds. `require_bearer` then compares `deps.expose_bearer()` (`"0123abcd\n"`) against `raw.strip_prefix("Bearer ")` — and HTTP header parsing strips trailing OWS from the presented value, so the presented token can never carry that newline. **Every** request is denied, with the same undifferentiated 403 as a forged token.
+
+This is exactly the path the doc comment at lines 39-42 anticipates: Phase 6 reads the token from the keychain. Keychain round-trips, file-backed fallbacks, and `Command` output all routinely carry a trailing `\n`. The failure is silent and fail-closed, and the only diagnostic is `warn!("bearer token mismatch")` — indistinguishable from an attacker. This will be expensive to diagnose in Phase 6.
+
+**Fix:** Normalize once, at the place that already calls `trim`:
+
+```rust
+pub fn new(
+    feedback: Arc<dyn FeedbackSource>,
+    comments: Arc<dyn CommentSink>,
+    bearer: impl Into<Arc<str>>,
+) -> Result<Self, McpError> {
+    // trim 一次并**存 trim 后的值**：只用 trim 判空、却存原值，会造出一个
+    // 「构造成功但永远比不中」的门禁（钥匙串读出的 token 常带尾随换行）。
+    let bearer: Arc<str> = Arc::from(bearer.into().trim());
+    if bearer.is_empty() {
+        return Err(McpError::EmptyBearer);
+    }
+    Ok(Self { feedback, comments, bearer })
+}
+```
+
+Extend `an_empty_bearer_is_refused_at_construction` with
+`assert_eq!(McpDeps::new(.., " tok ").unwrap().expose_bearer(), "tok");`.
+
+### WR-07: `require_bearer` matches the auth scheme case-sensitively, contrary to RFC 7235
+
+**Classification:** WARNING
+**File:** `crates/prism-mcp/src/middleware.rs:129`
+
+**Issue:** `raw.strip_prefix("Bearer ")` is byte-exact. RFC 7235 §2.1 defines `auth-scheme` as a case-insensitive token, and RFC 6750 clients legitimately send `bearer <token>` or `BEARER <token>`. Such a client is denied with an opaque 403 and a `warn!("Authorization scheme is not Bearer")` that never reaches it. The same line also rejects `Bearer  <token>` (RFC 7235 permits `1*SP` between scheme and credentials).
+
+Given the deliberate no-diagnostics design, a spec-compliant MCP client that lowercases the scheme is indistinguishable from an attack — in an integration (Phase 6, Claude Code and other agents) where the client is not under this project's control.
+
+**Fix:**
+
+```rust
+let Some((scheme, presented)) = raw.split_once(' ') else {
+    return deny("Authorization header carries no credentials");
+};
+if !scheme.eq_ignore_ascii_case("bearer") {
+    return deny("Authorization scheme is not Bearer");
+}
+let presented = presented.trim_start();
+if !constant_time_eq(deps.expose_bearer(), presented) {
+    return deny("bearer token mismatch");
+}
+```
+
+Add a row to `bearer_layer_alone_is_what_rejects_a_bad_token`'s table asserting `bearer <GOOD_BEARER>` is **accepted** (a negative control — without it, "fix by accepting everything" also passes).
+
+### WR-08: `errorCopy` reads through `Object.prototype` — some inputs return a function, not a string
+
+**Classification:** WARNING
+**File:** `src/lib/ipc.ts:41-70`
+
+**Issue:** `ERROR_COPY` is an object literal, so `ERROR_COPY[code]` resolves inherited members, and `??` substitutes the fallback only for `null`/`undefined`. Verified:
+
+```
+toString         function  function toString() { [native code] }
+constructor      function  function Object() { [native code] }
+valueOf          function  function valueOf() { [native code] }
+hasOwnProperty   function  function hasOwnProperty() { [native code] }
+__proto__        object    [object Object]
+nope             string    fallback     <- the intended behaviour
+```
+
+`errorCopy` declares `: string`; for those inputs it returns something else. The value flows straight into `setKeyNotice({ text })` / `setUrlNotice({ text })` and is rendered as `{notice.text}` in `NoticeLine` (`Settings.tsx:190`), where React throws on a function child — the Settings page unmounts to blank instead of showing an error line.
+
+Today's Rust command errors are a fixed short-code set, so this is latent rather than live. But the function's documented contract (lines 66-69) is "unknown ⇒ generic fallback, never render raw content", and that contract is violated for a small set of inputs. `Record<string, string>` provides no compile-time protection here.
+
+**Fix:**
 
 ```ts
 const ERROR_COPY: Record<string, string> = Object.assign(Object.create(null), {
@@ -428,525 +343,129 @@ const ERROR_COPY: Record<string, string> = Object.assign(Object.create(null), {
 });
 ```
 
-or
+or, keeping the literal:
 
 ```ts
 export function errorCopy(err: unknown): string {
   const code = typeof err === "string" ? err : "";
-  return Object.hasOwn(ERROR_COPY, code) ? ERROR_COPY[code] : "操作失败，请重试。";
+  return Object.prototype.hasOwnProperty.call(ERROR_COPY, code)
+    ? ERROR_COPY[code]
+    : "操作失败，请重试。";
 }
 ```
 
-Add `expect(errorCopy("toString")).toBe("操作失败，请重试。")` — it fails today.
+Add a test: `expect(errorCopy("toString")).toBe("操作失败，请重试。")`.
 
----
+### WR-09: `check-secrets.sh scan` silently narrows to the current directory subtree and still reports OK
 
-### WR-06: a failed status query renders as "未配置", making a keychain outage look like an empty keychain
+**Classification:** WARNING
+**File:** `scripts/check-secrets.sh:72`
 
-**File:** `src/pages/Settings.tsx:29-33`, `src/pages/Settings.tsx:100-102`, `src/pages/Settings.tsx:142`
+**Issue:** `git grep` searches from the current working directory downward by default, and the exclude pathspec `':(exclude).planning/'` is likewise cwd-relative. The script never `cd`s to the repository root. Verified:
 
-**Issue:** Neither `useQuery` result handles the error state:
-
-```tsx
-{keyStatus.isPending ? "读取中…" : keyStatus.data ? "已配置" : "未配置"}
+```
+$ cd src && bash ../scripts/check-secrets.sh scan
+OK: no plaintext secret in version-controlled files
+exit=0
 ```
 
-In TanStack Query v5, a rejected query settles with `isPending === false` and
-`data === undefined`, so after the default three retries the page states positively
-that no key is configured — when in fact the keychain was locked, permission was
-denied, or the IPC call failed. `baseUrl.data ?? "（未设置）"` (line 142) has the same
-shape: a failed read is presented as "not set".
+From the repo root `git grep` sees 97 files; from `src/` it sees 14. The narrowed run is indistinguishable from a clean full run — same message, same exit code. CI happens to invoke it from the root, so this is not a live CI hole, but a developer running it directly, a future pre-commit hook, or `just` invoked from a subdirectory gets a clean bill of health covering 14% of the tree. This is the same failure class the file exists to close: a check that cannot see its target still exits 0.
 
-This is the same class of defect the phase already fixed on the `listen()` path
-(`useEngineInvalidation.ts:15-19`: *"这一类失败不能被丢进未处理的 Promise"*, and
-`DevSmoke.test.tsx:148-161`'s "计数为 0 不足以作断言：正常状态下它也是 0"). The
-reasoning transfers exactly — "未配置" is indistinguishable from "read failed" — but
-the fix was not applied here. A user who sees "未配置" will re-enter their key, which
-then also fails to save, with no indication why.
+(`check-deps.sh` does not share this problem — cargo resolves the workspace root regardless of cwd.)
 
-The test file mirrors the gap: `Settings.test.tsx` covers `mockResolvedValue(false)`
-and `mockResolvedValue(true)` but never `mockRejectedValue`.
+**Fix:** Pin the working directory at the top of the script:
 
-**Fix:**
-
-```tsx
-{keyStatus.isPending
-  ? "读取中…"
-  : keyStatus.isError
-    ? "读取失败"
-    : keyStatus.data
-      ? "已配置"
-      : "未配置"}
+```bash
+cd "$(git rev-parse --show-toplevel)"
 ```
 
-with an accompanying `role="alert"` line carrying `errorCopy(keyStatus.error)`, the
-same treatment for `baseUrl`, and a test that asserts a rejected `apiKeyStatus` does
-**not** render "未配置".
+and consider a floor assertion inside `scan` (abort if the scanned-file count is implausibly small) so a future scoping bug goes red rather than green.
 
----
+### WR-10: `RUST_LOG` can raise every target to `trace`, undoing the deliberate restraint about log surface — and rmcp dumps whole MCP messages at that level
 
-### WR-07: dev-only commands ship in the release IPC surface, and one of them writes to the user's real database
+**Classification:** WARNING
+**File:** `src-tauri/src/lib.rs:34, 43-51`
 
-**File:** `src-tauri/src/lib.rs:48-59`, `crates/prism-engine/src/facade.rs:95-99`
+**Issue:** `DEFAULT_LOG_FILTER = "info"` and the comment at lines 32-33 justify *not* opening `debug` for `prism_mcp` on the grounds that the log sink is itself a new exfiltration surface (T-01-58). Line 44 then hands unbounded control of that surface to an environment variable: `EnvFilter::try_from_default_env()` accepts `RUST_LOG=trace` and applies it to every target, with no ceiling.
 
-**Issue:** `generate_handler!` registers `dev_ping`, `dev_emit_bus_event`,
-`dev_smoke_stream` and `dev_seed_sample_docs` unconditionally. Nothing is gated on
-`#[cfg(debug_assertions)]`.
+This is concrete, not theoretical. `rmcp-2.2.0/src/transport/streamable_http_server/tower.rs:1268,1288` contains `tracing::trace!(?message)` — full MCP message dumps. From Phase 5 onward those messages carry comment bodies and document excerpts, which is exactly what `prism_engine::services::record_receipt` goes out of its way not to log (T-01-33). One exported env var, or one leftover `RUST_LOG` in a developer's shell profile, reinstates it.
 
-`App.tsx:28` removes the dev *route button* from production builds
-(`import.meta.env.DEV` is statically false and the block is shaken out), and
-`DevSmoke.tsx:60-63` calls the page "隐藏 dev 冒烟页". Neither removes the *commands*.
-Any script executing in the WebView — which, given CR-02, includes remotely loaded
-script — can call `invoke("dev_seed_sample_docs")` and write three fixture documents
-plus a `smoke-project` row into the user's live `~/Library/Application Support/PrismDocs/prismdocs.db`,
-or spam `dev_emit_bus_event` to force UI invalidation storms.
+(I checked: hyper's `tracing` feature is *not* enabled in this dependency tree, so there is no Authorization-header dump path today. The rmcp message dump is the live one.)
 
-`dev_seed_sample_docs` is the one that actually mutates user data. Its project id is a
-hardcoded `"smoke-project"` (`seed.rs:16`), so the rows are indistinguishable from a
-real import at the schema level and will still be there in Phase 2.
+**Fix:** Cap the env-supplied filter rather than accepting it wholesale — apply `.with_max_level(tracing::Level::DEBUG)` on the subscriber, or parse `RUST_LOG` and fall back to `DEFAULT_LOG_FILTER` with a `warn!` when it exceeds a project ceiling. At minimum, append a non-overridable `rmcp=info` directive to whatever filter is built.
 
-**Fix:** gate the dev handlers at registration:
+### WR-11: The frontend URL pre-check is case-sensitive and rejects input the engine accepts
 
-```rust
-let builder = tauri::Builder::default();
-#[cfg(debug_assertions)]
-let builder = builder.invoke_handler(tauri::generate_handler![ /* prod + dev */ ]);
-#[cfg(not(debug_assertions))]
-let builder = builder.invoke_handler(tauri::generate_handler![ /* prod only */ ]);
-```
+**Classification:** WARNING
+**File:** `src/pages/Settings.tsx:25-27`
 
-At minimum gate `dev_seed_sample_docs`, which is the only one with a persistent side
-effect. `src-tauri/tests/ipc.rs` builds its own handler list and is unaffected either
-way.
+**Issue:** `!trimmed.startsWith("http://") && !trimmed.startsWith("https://")` is byte-exact, but URL schemes are case-insensitive and the `url` crate lowercases them — `validate_base_url("HTTPS://api.example.com/v1")` returns `Ok`. So `HTTPS://api.example.com/v1` is rejected locally with "链接必须以 http:// 或 https:// 开头", a message that directly contradicts what the user typed. On macOS an input without `autoCapitalize` set is a realistic source of a capitalized first character.
 
----
+The comment at lines 20-22 states the invariant as "「前端放过但 engine 拒绝」不会在正常输入上出现"; the reverse divergence is real and produces the more confusing outcome, because the copy asserts something the input already satisfies.
 
-### WR-08: `dev_smoke_stream` takes an unbounded `total` and runs it synchronously on the async runtime
-
-**File:** `src-tauri/src/commands.rs:131-137`
-
-**Issue:** Two departures from this file's own stated discipline, in one four-line
-command.
-
-`total: u32` is unvalidated. `smoke::generate` loops `0..total` sending one IPC message
-per iteration; `total = u32::MAX` is 4.29 billion messages. The frontend always passes
-1000 (`DevSmoke.tsx:20`), but the parameter is attacker-reachable from any script in
-the WebView (WR-07, CR-02).
-
-More structurally: `dev_smoke_stream` is `async fn` but calls `smoke::generate`
-directly rather than through `delegate`'s `spawn_blocking`. The module header
-(`commands.rs:47-51`) explains why that matters — *"一次慢查询会卡住整个 IPC 线程"* —
-and this is the one command in the file that does not follow it. Even at `total = 1000`
-the whole loop runs inline on the async runtime; at any larger value it blocks the IPC
-executor outright. This is not a channel-send-bound loop that yields: `Channel::send`
-is synchronous.
-
-**Fix:** clamp and offload:
-
-```rust
-const SMOKE_MAX_TOTAL: u32 = 10_000;
-
-#[tauri::command]
-pub async fn dev_smoke_stream(
-    on_event: tauri::ipc::Channel<SmokeEvent>,
-    total: u32,
-) -> Result<(), String> {
-    let total = total.min(SMOKE_MAX_TOTAL);
-    tauri::async_runtime::spawn_blocking(move || {
-        smoke::generate(total, |ev| on_event.send(ev))
-    })
-    .await
-    .map_err(|_| ERR_TASK.to_string())?
-    .map_err(|_| ERR_CHANNEL.to_string())
-}
-```
-
-`smoke::collect`'s `Vec::with_capacity(total as usize + 2)` (`smoke.rs:44`) is the
-same unbounded value; it is test-only today but will over-allocate if ever reused.
-
----
-
-### WR-09: the "least privilege" capability assertion is a denylist, so new permissions pass silently
-
-**File:** `src/lib/capabilities.test.ts:26-32`
-
-**Issue:**
+**Fix:** Parse first, then test the parsed scheme — which also removes the duplicated scheme knowledge:
 
 ```ts
-const forbidden = capability.permissions.filter((p) =>
-  /^(fs|shell|http|dialog|core:webview|core:window):/.test(p),
-);
-expect(forbidden).toEqual([]);
-```
-
-The comment above it claims to assert 最小权限, but the mechanism is a fixed denylist
-of six prefixes. Anything outside those prefixes is admitted without comment —
-including `core:event:allow-emit`, which would let frontend script forge
-`prism://changed` events straight into the invalidation pipeline, and every
-`core:app:*`, `core:path:*`, `core:resources:*`, `core:tray:*`, `core:menu:*` and
-third-party `plugin:*` permission that later phases will be tempted to add.
-
-The test is exactly as strong as the imagination of whoever wrote the regex, which is
-the failure mode a least-privilege assertion exists to prevent. Since the granted set
-is currently two entries and the file's whole purpose is that additions be deliberate,
-an exact-equality check costs nothing and is strictly stronger.
-
-**Fix:**
-
-```ts
-expect(capability.permissions).toEqual([
-  "core:event:allow-listen",
-  "core:event:allow-unlisten",
-]);
-```
-
-Adding a permission then requires editing this line, which is the review checkpoint
-the denylist was trying to approximate.
-
----
-
-### WR-10: the secret scanner misses Anthropic key format and every non-`api_key` spelling
-
-**File:** `scripts/check-secrets.sh:18-23`
-
-**Issue:** The pattern is
-
-```
-sk-[A-Za-z0-9]{16,}|api[_-]?key[[:space:]]*=[[:space:]]*"…"
-```
-
-Three gaps, the first of which matters most for this project:
-
-1. **`sk-ant-…` does not match.** `sk-` must be followed by ≥16 consecutive
-   alphanumerics; an Anthropic key is `sk-ant-api03-…`, which breaks at the hyphen
-   after three characters. `CLAUDE.md` names Anthropic's Messages API as a first-class
-   endpoint and `Settings.tsx:149` uses `https://api.anthropic.com` as the placeholder,
-   so the provider whose keys this project is most likely to leak is the one the
-   scanner cannot see.
-2. **Only `=` assignment with `api_key`-ish names.** `apiKey: "…"` (TS/JSON — the
-   dominant form in this repo's frontend and in `tauri.conf.json`), `token = "…"`,
-   `secret = "…"`, `password = "…"`, `Authorization: "Bearer …"` and
-   `ANTHROPIC_API_KEY=…` in a committed `.env` all pass.
-3. **`docs/` is excluded wholesale.** The exclusion is justified for `.planning/`
-   (which quotes the regexes), but `docs/` is ordinary version-controlled prose that a
-   future runbook or troubleshooting note could easily paste a real key into.
-
-**Fix:** widen the alternation and narrow the exclusion:
-
-```bash
-PATTERN="sk-[A-Za-z0-9_-]{20,}|(api[_-]?key|secret|token|password)[[:space:]]*[=:][[:space:]]*${QUOTE}${NOT_QUOTE}{12,}|ghp_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}"
-```
-
-Drop `':(exclude)docs/'` and instead exclude the two or three specific documents that
-quote patterns. Verify the widened pattern against the existing fixtures
-(`FIXTURE_SECRET`, `FAKE_KEY`) — both were chosen not to trip the scanner and should
-still not trip it.
-
----
-
-### WR-11: `check_dup` swallows `cargo tree` failure and passes vacuously
-
-**File:** `scripts/check-deps.sh:34-43`
-
-**Issue:**
-
-```bash
-out=$(cargo tree --workspace --duplicates --edges normal || true)
-if grep -Eq '^(rusqlite|reqwest|libsqlite3-sys) v' <<<"$out"; then
-```
-
-If `cargo tree` fails for any reason — a lock-file conflict, an unresolvable feature
-combination, a registry outage, a `cargo` version whose flag surface changed — `|| true`
-converts the failure into an empty string, `grep` finds nothing, and the function
-prints `OK: no duplicate rusqlite/reqwest/libsqlite3-sys`. The assertion that Success
-Criterion 1-b depends on reports success precisely when it has learned nothing. This is
-the shell equivalent of the vacuous-assertion class the phase has been hunting.
-
-The five other checks in this file all let `cargo tree` fail loudly under `set -e`,
-which is the correct behaviour; only this one opts out, and the comment gives no reason.
-
-**Fix:**
-
-```bash
-if ! out=$(cargo tree --workspace --duplicates --edges normal); then
-  echo "FAIL: cargo tree --duplicates could not run" >&2
-  return 1
-fi
-```
-
----
-
-### WR-12: the MCP handler ignores its own schema's `required` field
-
-**File:** `crates/prism-mcp/src/handler.rs:36-53` (schema), `crates/prism-mcp/src/handler.rs:85-91` (extraction)
-
-**Issue:** The tool descriptor declares `"required": ["projectId"]` and a
-`"type": "string"`, then the handler drops both:
-
-```rust
-let project_id = request.arguments.as_ref()
-    .and_then(|args| args.get("projectId"))
-    .and_then(|v| v.as_str())
-    .unwrap_or_default()
-    .to_owned();
-```
-
-A call with no `arguments` at all, with `projectId` absent, or with
-`projectId: 42` / `projectId: null` is silently coerced to `""` and passed to
-`list_feedback`. Today `Engine::list_feedback` happens to reject the empty string
-(`services.rs:38-41`) so the outcome is an error rather than a wrong answer — but that
-is the *injected implementation's* validation covering for the handler's, and the
-handler is documented as the place Phase 6 extends. A future `FeedbackSource` that
-treats `""` as "all projects" turns this into a cross-project data leak with no code
-change here.
-
-The error the caller receives is also misleading: a *malformed request* is reported as
-`internal_error` (line 99) rather than as an invalid-params error.
-
-**Fix:** validate at the boundary, where the schema says the contract is:
-
-```rust
-let project_id = request
-    .arguments
-    .as_ref()
-    .and_then(|args| args.get("projectId"))
-    .and_then(|v| v.as_str())
-    .filter(|s| !s.trim().is_empty())
-    .ok_or_else(|| ErrorData::invalid_params("projectId must be a non-empty string", None))?
-    .to_owned();
-```
-
-Keep the message rule-shaped, not value-shaped (T-01-04). Add a test that
-`tools/call` with `arguments: {}` returns invalid-params rather than internal error.
-
----
-
-### WR-13: agent-supplied `status` is logged verbatim, contradicting the comment above it
-
-**File:** `crates/prism-engine/src/services.rs:53-63`
-
-**Issue:** The doc comment states the rule precisely — *"日志里只有 comment_id 与
-status，没有正文（T-01-33）：回执正文来自外部 agent，可能整段引用用户文档"* — and then
-logs `status` with no validation:
-
-```rust
-tracing::info!(comment_id = %receipt.comment_id, status = %receipt.status, "recorded an agent receipt");
-```
-
-`Receipt.status` is a `String` deserialised straight off the MCP wire
-(`prism-types/src/dto.rs:19-24`). Only `comment_id` is checked, and only for emptiness.
-Nothing constrains `status` to the small enum the field clearly intends
-(`applied` / `rejected` / …): an external agent can put a megabyte of document text, or
-embedded newlines forging additional log lines, into a field the comment asserts is
-safe to log. The reasoning that excluded the receipt body applies verbatim to `status`;
-it just was not carried across.
-
-Currently harmless only because WR-04 means the line is never written — which is not a
-mitigation to rely on.
-
-**Fix:** constrain the field to its intended domain and reject anything else, keeping
-the rejection text rule-shaped:
-
-```rust
-const ALLOWED_STATUS: [&str; 3] = ["applied", "rejected", "deferred"];
-if !ALLOWED_STATUS.contains(&receipt.status.as_str()) {
-    return Err(ServiceError::Invalid("status is not a recognised value".into()));
+function localUrlIssue(raw: string): "invalid_url" | "invalid_url_credentials" | null {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return "invalid_url";
+  }
+  // `URL.protocol` 已经小写化，与 engine 侧 url crate 的口径一致
+  if (url.protocol !== "http:" && url.protocol !== "https:") return "invalid_url";
+  if (url.hostname === "") return "invalid_url";
+  if (url.username !== "" || url.password !== "") return "invalid_url_credentials";
+  if (url.search !== "" || url.hash !== "") return "invalid_url_credentials";
+  return null;
 }
 ```
-
-Better still, make it an enum in `prism-types` so serde rejects it at the boundary.
-
----
-
-### WR-14: `accepts_fully_valid_request` passes on a 500
-
-**File:** `crates/prism-mcp/tests/middleware_gate.rs:207-217`
-
-**Issue:** The A-group negative control asserts `!status.is_client_error()`. A 500, a
-502, or any other server-side failure satisfies it. The test is titled "三层不是把所有
-请求都拒了" and its stated job is to prove a fully valid request reaches the MCP
-service — but a request that reaches the service and then explodes is scored as a pass.
-
-`rejects_missing_or_wrong_bearer` (lines 191-203) uses the same loose
-`is_client_error()` shape. That one is defensible (the non-disclosure design
-deliberately leaves 401-vs-403 unspecified), but the positive control has no such
-excuse: it knows exactly what success looks like.
-
-`trait_injection.rs` does assert `is_success()` on the full handshake, so the property
-is covered elsewhere — which is an argument for tightening this assertion, not for
-leaving it loose.
-
-**Fix:**
-
-```rust
-assert!(status.is_success(), "三层头全合法的请求未到达 mcp service: {status}");
-```
-
----
-
-### WR-15: `constant_time_eq`'s XOR fold is unreachable logic in a security primitive
-
-**File:** `crates/prism-mcp/src/middleware.rs:143-162`
-
-**Issue:** The function folds `presented` into an `expected`-length buffer, then ANDs
-the byte comparison with a length comparison:
-
-```rust
-let same_len = (expected.len() as u64).ct_eq(&(presented.len() as u64));
-let same_bytes = expected.ct_eq(padded);
-(same_len & same_bytes).into()
-```
-
-Because the result requires `same_len`, the only case that can return `true` is
-`presented.len() == expected.len()` — and in that case the fold is the identity
-function (each slot is XORed exactly once from zero). Every branch the fold exists to
-handle is already excluded by `same_len`. The heap allocation, the modulo, and the
-`&folded[..0]` sentinel are all dead weight, and the four "fold must not collide" test
-cases at lines 201-205 are testing a code path that cannot influence the result.
-
-The behaviour is correct — I traced it — but hand-rolled complexity inside an
-authentication comparison is exactly where a future edit introduces a real bug, and
-the accompanying comment ("超出部分参与折叠而非被丢弃") describes a security property
-the `same_len` gate already provides more simply.
-
-**Fix:** `subtle`'s slice `ct_eq` already returns `Choice(0)` on a length mismatch:
-
-```rust
-fn constant_time_eq(expected: &str, presented: &str) -> bool {
-    !expected.is_empty() && expected.as_bytes().ct_eq(presented.as_bytes()).into()
-}
-```
-
-The leading emptiness check also closes CR-03. Keep the existing test cases — they all
-still apply, and `constant_time_eq("", "")` flips to `false`, which is what it should
-have been.
-
----
-
-### WR-16: clippy `-D warnings` does not cover `prism-cli` or `prismdocs-shell`, and there is no frontend linter
-
-**File:** `.github/workflows/ci.yml:37-38`, `.github/workflows/ci.yml:85-101`
-
-**Issue:** The clippy step names the eight engine crates explicitly. `prism-cli` and
-`prismdocs-shell` are excluded, so `src-tauri/src/{lib,commands,bus_adapter,smoke}.rs`
-and `crates/prism-cli/src/main.rs` — the two crates carrying the IPC boundary and the
-future `externalBin` — are the only Rust in the repo with no lint gate. The
-`prism-cli` package is also absent from both the clippy and the `cargo test` steps; its
-tests run only as a side effect of `cargo llvm-cov --no-report --workspace` in the
-coverage step, which is an accidental rather than a declared gate.
-
-On the frontend, `npm run build` does run `tsc --noEmit` (verified in `package.json`),
-so type checking is gated — but there is no ESLint configuration in the repo at all, so
-no rule catches unused variables, missing hook dependencies, floating promises, or
-`no-console` in a codebase that deliberately routes every error through `errorCopy`.
-
-**Fix:** add the two crates to the clippy invocation (`-p prism-cli -p prismdocs-shell`;
-the latter needs `--features test` to cover `tests/ipc.rs`), add `-p prism-cli` to the
-engine test step, and add a minimal `eslint` + `typescript-eslint` +
-`eslint-plugin-react-hooks` config with an `npm run lint` step in the frontend job.
 
 ## Info
 
-### IN-01: stale counts in `tests/ipc.rs` comments
+### IN-01: API key is emptiness-checked on `trim()` but stored untrimmed
 
-**File:** `src-tauri/tests/ipc.rs:125-128`, `src-tauri/tests/ipc.rs:138-143`, `src-tauri/tests/ipc.rs:145`
+**Classification:** WARNING (low severity)
+**File:** `src/pages/Settings.tsx:90-94`; propagates through `crates/prism-llm/src/secrets.rs:44`, which also does not trim
 
-**Issue:** *"不需要钥匙串的六个命令"* precedes a `[&str; 7]`; *"需要钥匙串的两个命令"*
-precedes a `[&str; 3]`; *"八个命令全部可经 IPC 到达"* describes a `COMMANDS: [&str; 10]`.
-The arrays are right and the prose is stale.
+**Issue:** `submitKey` guards with `secretDraft.trim() === ""` but calls `saveKey.mutate(secretDraft)` — the raw value. A key pasted with a trailing newline or space (the normal result of copying from a provider console) is stored verbatim in the keychain. `api_key_status()` then reports `已配置`, the UI says everything is fine, and every Phase 4 LLM call returns 401 with no local signal pointing at whitespace. Same asymmetry as WR-06, in the other secret path.
 
-**Fix:** update the three counts, or drop the numerals from the comments so they cannot
-drift again.
+**Fix:** `saveKey.mutate(secretDraft.trim())` in `Settings.tsx`, and defensively `set_password(secret.trim())` in `prism-llm`. Add an assertion to `Settings.test.tsx` that a key typed as `` `${FAKE_KEY}\n` `` reaches `setApiKey` as `FAKE_KEY`.
 
----
+### IN-02: `tracing_init_installs_a_global_subscriber_and_is_idempotent` depends on being the only test in its binary that touches tracing
 
-### IN-02: `insert_samples` returns a constant, not a row count
+**Classification:** WARNING (low severity)
+**File:** `src-tauri/src/lib.rs:104-120`
 
-**File:** `crates/prism-store/src/seed.rs:51-92`
+**Issue:** Line 106 asserts the *first* `init_tracing()` returns `true`, against a process-global dispatcher, in a test binary cargo runs multi-threaded. It holds today only because no other test in `prismdocs-shell`'s unit-test binary (`commands.rs:140`, `bus_adapter.rs:72`, `smoke.rs:53` all have `mod tests`) installs a subscriber. The moment one does — a natural thing to add when asserting on log output — this test flakes non-deterministically, and its failure message ("the first init_tracing() should install") points at the wrong code.
 
-**Issue:** The doc comment says *"返回写入的文档条数"*, but the function returns
-`SAMPLE_DOCS.len()` regardless of what the statements actually did. It is currently
-harmless (`Engine::seed_sample_docs` discards the value), but it is a return value that
-cannot report a failure it was asked to report.
+The doc comment already reasons carefully about not putting process-global preconditions into a discriminating test; the same reasoning applies to assertion ① itself.
 
-**Fix:** accumulate `stmt.execute(...)?` return values, or change the signature to
-`Result<(), StoreError>` and let the constant live at the call site.
+**Fix:** Mark it `#[serial]` (`serial_test` is already a workspace dev-dependency, used in `crates/prism-engine/tests/facade.rs`), or drop assertion ① and keep only ② (`has_been_set()`) and ③ (idempotence), which carry the discriminating power without depending on call order.
 
----
+### IN-03: CI coverage step scope contradicts the job's own comments
 
-### IN-03: `assert_sqlite_version` silently reindexes malformed version strings
+**Classification:** WARNING (low severity)
+**File:** `.github/workflows/ci.yml:39-58`
 
-**File:** `crates/prism-store/src/open.rs:93-105`
+**Issue:** Clippy (line 40) and test (line 43) use an explicit eight-crate "engine selection set", and the comment at lines 65-66 explains that `prismdocs-shell` needs a separate job because its tests require `--features test`. The coverage step at line 50 then runs `cargo llvm-cov --no-report --workspace`, which builds and runs `prismdocs-shell` **without** `--features test` — so its `#![cfg(feature = "test")]` IPC tests compile to zero tests, exactly the failure mode lines 65-66 warn about — and publishes the result under the heading `### Engine coverage` (line 54).
 
-**Issue:** `version.split('.').filter_map(|s| s.parse().ok())` drops unparsable
-components rather than failing, so a version like `3.x.51` collapses to `(3, 51, 0)` —
-the dropped element shifts every later component one position left. The same idiom
-appears in `lib.rs:39-41`, `concurrency.rs:13-20` and `prism-engine/src/lib.rs:56`.
-Contrived for `sqlite_version()`, which is well-formed in practice, but the failure
-mode is a wrong comparison rather than an error.
+The reported number therefore mixes in shell code exercised by an incomplete test set, mislabelled as engine coverage. Since Phase 2 is stated to convert this figure into a hard gate, the baseline being measured is not the one being labelled.
 
-**Fix:** parse positionally and reject a malformed string outright:
+**Fix:** Either narrow the coverage run to the same eight crates (`cargo llvm-cov --no-report -p prism-types -p prism-store …`) or keep `--workspace` and add `--features prismdocs-shell/test`, and relabel the summary heading accordingly.
 
-```rust
-let mut it = version.split('.').map(str::parse::<u32>);
-let got = match (it.next(), it.next(), it.next()) {
-    (Some(Ok(a)), Some(Ok(b)), Some(Ok(c))) => (a, b, c),
-    _ => return Err(StoreError::SqliteTooOld(version)),
-};
-```
+### IN-04: Minor script and config inconsistencies
+
+**Classification:** WARNING (low severity)
+
+- **`scripts/check-deps.sh:66, 115, 154`** — `grep -q '^prism-engine'` and `grep -oE '^prism-[a-z]+'` both prefix-match. A future `prism-engine-core` would satisfy the no-cycle check while genuinely being a cycle, and a `prism-mcp2` would be truncated to `prism-mcp` in the offenders set. *Fix:* anchor on the version field — `grep -q '^prism-engine v'`, and `grep -oE '^prism-[a-z0-9-]+ '` with the trailing space, stripped afterwards.
+- **`tsconfig.json`** declares `"types": ["vite/client", "vitest/globals"]` while `vite.config.ts` does not set `test.globals: true`, and `src/pages/Settings.test.tsx:41-43` explicitly notes globals are off and registers `afterEach(cleanup)` by hand. The `vitest/globals` entry is dead configuration that advertises the opposite of the real setup. *Fix:* drop `"vitest/globals"`.
+- **`.github/workflows/ci.yml:6`** — `on: [push, pull_request]` double-runs every same-repo PR, and there is no `concurrency:` group or `permissions:` block. *Fix:* add `permissions: { contents: read }` and `concurrency: { group: "${{ github.workflow }}-${{ github.ref }}", cancel-in-progress: true }`.
+- **`.github/workflows/ci.yml:29`** — the `engine` job's `restore-keys: ${{ runner.os }}-cargo-` is a prefix of the `shell` job's key `${{ runner.os }}-cargo-shell-…`, so the engine job can restore the shell job's `target/`. Harmless today, but the two jobs compile different feature sets. *Fix:* rename the engine key to `${{ runner.os }}-cargo-engine-…` with a matching restore-key.
 
 ---
 
-### IN-04: `require_local_host` rejects HTTP/2 requests that carry the authority in `:authority`
-
-**File:** `crates/prism-mcp/src/middleware.rs:77-91`
-
-**Issue:** The layer requires a literal `Host` header and denies when it is absent.
-Over HTTP/2 the authority arrives in the `:authority` pseudo-header and hyper does not
-synthesise a `Host` header — rmcp handles exactly this case
-(`tower.rs:397-408`, with a comment noting that `axum::Router::nest` can drop the
-synthesised header). Cleartext HTTP/2 requires prior-knowledge negotiation, so no MCP
-client in scope will hit it today, but any future h2-capable client is silently 403'd
-with no diagnosable reason (see WR-04).
-
-**Fix:** fall back to `request.uri().authority()` when the `Host` header is absent,
-matching the SDK's behaviour, before denying.
-
----
-
-### IN-05: `ServiceError::Backend` has no construction site
-
-**File:** `crates/prism-types/src/service.rs:40-42`
-
-**Issue:** Neither implementation of `FeedbackSource`/`CommentSink` (nor any test)
-constructs `Backend`. It is dead today. The enum is `#[non_exhaustive]` and the variant
-is clearly reserved for Phase 5/6 storage failures, so this is a note rather than a
-defect — but the same reasoning that produced `prismdocs-helper doctor` (giving
-`HelperError`'s variants a construction site so `clippy -D warnings` passes) argues for
-either using it or deferring it.
-
-**Fix:** leave as-is if Phase 5 lands soon; otherwise remove and reintroduce with its
-first real caller.
-
----
-
-### IN-06: error notices on the smoke page use `role="status"` rather than `role="alert"`
-
-**File:** `src/pages/DevSmoke.tsx:159`
-
-**Issue:** A single `notice` state carries both successes ("样例文档已写入。") and
-failures (`errorCopy(err)`, including the listen-rejected copy), and all of them render
-in a `role="status"` region. `status` is a polite live region; assistive technology
-will not interrupt for it. `Settings.tsx`'s `NoticeLine` gets this right by switching
-to `role="alert"` on the error tone, and `DevSmoke.test.tsx:157` asserts against
-`findByRole("status")`, so the test encodes the weaker behaviour.
-
-**Fix:** adopt `Settings.tsx`'s `Notice` shape (`{ tone, text }`) on this page and
-switch the role accordingly; update the test to `findByRole("alert")` for the
-listen-failure case.
-
----
-
-_Reviewed: 2026-07-29_
+_Reviewed: 2026-07-29T05:57:42Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
