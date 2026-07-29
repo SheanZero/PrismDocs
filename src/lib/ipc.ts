@@ -38,7 +38,15 @@ export const SETTING_BASE_URL = "llm.base_url";
 // 命令的错误是**稳定短码串**，不是给人读的句子。短码是给代码分支用的契约；
 // 面向用户的文案在这里生成，且**从不把码串本身放进 UI**——那既没用也是内部细节。
 
-const ERROR_COPY: Record<string, string> = {
+/// 短码 → 文案的查找表。**刻意建在 `Object.create(null)` 之上**，不是对象字面量。
+///
+/// 对象字面量的查找会走到 `Object.prototype`：`TABLE["toString"]` 拿到的是一个**函数**、
+/// `TABLE["__proto__"]` 拿到的是一个**对象**，两者都不是 `undefined`，于是 `?? 兜底` 不生效。
+/// 而下面 `errorCopy` 的入参是任意 `unknown`——一个恰好等于 `"constructor"` 的错误串就够了。
+///
+/// 二选一（无原型容器 / `Object.hasOwn` 判定）里选前者：后者要求**每一个**查找点都记得
+/// 那样写，那是约定；容器没有原型链则是机制，第二个查找点加进来时也不会出事。
+const ERROR_COPY: Record<string, string> = Object.assign(Object.create(null), {
   invalid_url: "链接必须以 http:// 或 https:// 开头，并带有主机名。",
   invalid_url_credentials:
     "端点链接里不能带用户名或密码（形如 user:pass@host），也不能带查询串（?…）或锚点（#…）。密钥请填在上面的 API key 栏——它只进系统钥匙串，不入数据库。",
@@ -49,7 +57,7 @@ const ERROR_COPY: Record<string, string> = {
   channel_send_failed: "数据流通道已关闭。",
   engine_error: "引擎遇到一个内部错误。",
   listen_failed: "事件通道未能建立，界面不会随引擎变更自动刷新。",
-};
+});
 
 /// `listen()` 建不起来时用的码。
 ///
@@ -60,10 +68,16 @@ const ERROR_COPY: Record<string, string> = {
 /// 会把「本页从此收不到任何事件」说成一次可重试的操作失败。
 export const LISTEN_FAILED = "listen_failed";
 
-/// 把命令错误译成中文文案。
+/// 把命令错误译成中文文案。**任何输入都返回字符串。**
 ///
 /// 无法识别时给的是**通用**兜底，而不是 `String(err)`：把未知内容原样渲染进 DOM
 /// 正是「内部细节泄漏到界面」的常见入口，而错误对象里可能恰好带着不该露面的东西。
+///
+/// 声明的返回类型是 `string`，但 `Record<string, string>` 在这里**不提供编译期保护**——
+/// `ERROR_COPY[code]` 的静态类型是 `string`，而在对象字面量上它的运行期值可能是一个函数。
+/// 这个值会一路流进 `setKeyNotice({ text })` 并被 `NoticeLine` 渲染成 `{notice.text}`，
+/// 而 React 对函数子节点抛错——设置页整页卸载成空白，而不是显示一行错误。
+/// 这是 `ERROR_COPY` 建在 `Object.create(null)` 之上的理由，不是一句可省略的注解。
 export function errorCopy(err: unknown): string {
   const code = typeof err === "string" ? err : "";
   return ERROR_COPY[code] ?? "操作失败，请重试。";
