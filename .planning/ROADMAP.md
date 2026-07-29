@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. SQLite schema v1 落地：WAL + 单写者 + r2d2 读池（query_only=ON）并发读写正常；FTS5 中文查询返回非零结果（CJK tokenizer 在 schema v1 定案）；rusqlite_migration 迁移体系可用，bundled SQLite ≥3.51.3
   4. API key 经 keyring-core + apple-native-keyring-store 写入系统钥匙串并可读回，prism-llm 为唯一网络出口与唯一密钥入口，代码与配置中无明文密钥
 
-**Plans**: 13/13 plans executed
+**Plans**: 28 plans（01-01…01-13 已执行；01-14…01-28 为第二轮 gap-closure，待执行）
 
 Plans:
 **Wave 1**
@@ -82,6 +82,39 @@ Plans:
 **Gap-closure Wave 2** *(blocked on 01-11 — 同为 prism-mcp 文件)*
 
 - [x] 01-12-PLAN.md — prism-mcp 空 bearer 由 fail-open 改为构造期即拒 + 比较层纵深（CR-03）
+
+**Gap-closure Wave 3** *(第二轮缺口修补集起点；波次再次相对本修补集起算，plan frontmatter 的 `wave: 1` 对应本波)*
+
+- [ ] 01-14-PLAN.md — 【Blocker】明文密钥扫描器看得见未加引号的赋值 + scan 作用域固定到仓库根（01-VERIFICATION gaps[0]、本轮 CR-01、本轮 WR-09）
+
+**Gap-closure Wave 4** *(blocked on 01-14 —— 全部计划的验收都要求 `check-secrets.sh all` 退出 0)*
+
+- [ ] 01-15-PLAN.md — 依赖方向断言不再吞掉 `cargo tree` 失败 + crate 名锚定（本轮 WR-04 ≡ 上轮 WR-11、本轮 IN-04a）
+- [ ] 01-16-PLAN.md — prism-mcp 门禁比较层去死代码、bearer 构造期归一化、scheme 大小写不敏感（本轮 WR-05/06/07 ≡ 上轮 WR-15）
+- [ ] 01-18-PLAN.md — prism-store 打开与收尾的三处静默降级（上轮 WR-02 / WR-03 / IN-03）
+- [ ] 01-20-PLAN.md — agent 回执 status 入日志的取值约束 + 移除死变体（上轮 WR-13 / IN-05）
+- [ ] 01-21-PLAN.md — 日志面上限（`RUST_LOG` 封顶）、tracing 测试串行化、dev 命令移出 release IPC 面（本轮 WR-10 / IN-02、上轮 WR-07 / IN-01）
+- [ ] 01-22-PLAN.md — dev 冒烟通路的输入上界与 offload + 失败通知改 `role="alert"`（上轮 WR-08 / IN-06）
+- [ ] 01-23-PLAN.md — 前端错误文案容器去原型链、URL 判定与 engine 对齐、密钥两端裁剪、query 错误态（本轮 WR-08/WR-11/IN-01 ≡ 上轮 WR-05、上轮 WR-06）
+- [ ] 01-24-PLAN.md — CSP 补 `form-action`/`frame-ancestors` + CSP 与 capability 断言由 denylist 改精确相等（本轮 WR-01/WR-02 ≡ WR-A、上轮 WR-09）
+- [ ] 01-25-PLAN.md — 记账：INFRA-03 改映射 Phase 4 并加表下注；`deferred-items.md` 两条候选定案
+
+**Gap-closure Wave 5** *(blocked on 同 crate 的 Wave 4 计划 —— 文件冲突)*
+
+- [ ] 01-17-PLAN.md — 无差别 403 契约对实发路由成立 + handler 执行自身 schema（本轮 WR-03、上轮 WR-14 / WR-12 / IN-04）·依赖 01-16
+- [ ] 01-19-PLAN.md — prism-store 断言强度：恒真断言、版本下界、返回值（上轮 WR-01 / IN-02、01-VERIFICATION 新增 warning）·依赖 01-18
+
+**Gap-closure Wave 6** *(blocked on 前端计划 —— lint 首跑需要 `src/` 已稳定)*
+
+- [ ] 01-26-PLAN.md — 前端 linter 落地（ESLint flat config + `npm run lint`），含包合法性 blocking-human 闸门（上轮 WR-16 后半）
+
+**Gap-closure Wave 7** *(blocked on 全部代码计划 —— clippy 扩面要求受检 crate 已修好)*
+
+- [ ] 01-27-PLAN.md — CI 闸门扩面：clippy 覆盖 `prism-cli`/`prismdocs-shell`、coverage 范围与标题对齐、workflow 卫生、tsconfig 死配置、接上前端 lint（上轮 WR-16 前半、本轮 IN-03 / IN-04bcd）
+
+**Gap-closure Wave 8** *(blocked on 01-27 —— 全仓格式化触及每一个 Rust 文件)*
+
+- [ ] 01-28-PLAN.md — rustfmt 取向二选一（`checkpoint:decision`）并落地；汇总 Phase 收尾的两项人工验证（`deferred-items.md` 01-03 登记项）
 
 ### Phase 2: F1 导入与同步
 
