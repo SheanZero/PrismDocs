@@ -99,18 +99,33 @@ pub fn open(db_path: &Path) -> Result<Store, StoreError> {
     })
 }
 
+/// `major.minor.patch` **按位**解析；任一分量缺失或解析不了就整个失败。
+///
+/// 为什么不用 `filter_map(|s| s.parse().ok())`：那个写法丢掉不可解析的分量而不是失败，
+/// 于是 `3.x.51` 塌缩成 `(3, 51, 0)` —— 被丢掉的那一位把后面每个分量左移一格，得到一个
+/// 碰巧够新的元组。失败形态是「比较结果错误」而不是报错（上轮 IN-03）。
+///
+/// 抽成纯函数是为了能被直接喂畸形串：真实 SQLite 的 `sqlite_version()` 永远良构，
+/// 经它调用时这条分支在自动化里从来走不到。
+///
+/// 同一惯用法在仓库里还有三处——`lib.rs` 的 `parts`、`tests/concurrency.rs` 的
+/// `version_tuple`、`prism-engine/src/lib.rs`。**它们不是漏改**：那三处的调用点都是测试或
+/// 展示用途，只有这里进入 `open()` 的准入判定路径（`lib.rs` 那一处由 01-19 处理）。
+fn parse_sqlite_version(version: &str) -> Option<(u32, u32, u32)> {
+    let mut parts = version.split('.').map(str::parse::<u32>);
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(Ok(major)), Some(Ok(minor)), Some(Ok(patch))) => Some((major, minor, patch)),
+        _ => None,
+    }
+}
+
 fn assert_sqlite_version(conn: &Connection) -> Result<(), StoreError> {
     let version: String = conn.query_row("SELECT sqlite_version()", [], |r| r.get(0))?;
-    let parts: Vec<u32> = version.split('.').filter_map(|s| s.parse().ok()).collect();
-    let got = (
-        parts.first().copied().unwrap_or(0),
-        parts.get(1).copied().unwrap_or(0),
-        parts.get(2).copied().unwrap_or(0),
-    );
-    if got < MIN_SQLITE {
-        return Err(StoreError::SqliteTooOld(version));
+    // 畸形串在语义上就是「无法证明它够新」，与太旧同一处置，不需要第三个变体。
+    match parse_sqlite_version(&version) {
+        Some(got) if got >= MIN_SQLITE => Ok(()),
+        _ => Err(StoreError::SqliteTooOld(version)),
     }
-    Ok(())
 }
 
 impl Store {
@@ -252,22 +267,29 @@ mod tests {
     /// 而不是报错，所以这条得直接喂畸形串，真实 SQLite 永远给不出它们。
     #[test]
     fn version_admission_rejects_malformed_strings() {
-        let admits =
-            |v: &str| matches!(super::parse_sqlite_version(v), Some(got) if got >= super::MIN_SQLITE);
+        // (输入, 期望的解析结果)。畸形串必须解析成 None——而不是「解析成一个碰巧不够新
+        // 的元组」，那只是运气：把 MIN_SQLITE 的 patch 位调低，同一个 bug 就会放行。
         let cases = [
-            ("3.53.2", true),   // 高于下界
-            ("3.51.3", true),   // 恰好等于下界
-            ("3.51.2", false),  // 低于下界
-            ("3.x.51", false),  // 畸形：不得被重排成 (3, 51, 0) 从而通过
-            ("3.51", false),    // 少一个分量
-            ("", false),        // 空串
+            ("3.53.2", Some((3, 53, 2))), // 高于下界
+            ("3.51.3", Some((3, 51, 3))), // 恰好等于下界
+            ("3.51.2", Some((3, 51, 2))), // 低于下界
+            ("3.x.51", None),             // 畸形：filter_map 形态会把它重排成 (3, 51, 0)
+            ("3.x.53", None),             // 同上，但重排结果 (3, 53, 0) **够新**——真正的放行口
+            ("3.51", None),               // 少一个分量
+            ("", None),                   // 空串
         ];
         for (input, expected) in cases {
             assert_eq!(
-                admits(input),
+                super::parse_sqlite_version(input),
                 expected,
-                "version {input:?} should {} admission",
-                if expected { "pass" } else { "fail" }
+                "parse of {input:?}"
+            );
+            // 准入 = 解析成功且不低于下界。畸形串因此与「太旧」同一处置。
+            let admits = matches!(super::parse_sqlite_version(input), Some(got) if got >= super::MIN_SQLITE);
+            assert_eq!(
+                admits,
+                expected.is_some_and(|got| got >= super::MIN_SQLITE),
+                "admission of {input:?}"
             );
         }
     }
