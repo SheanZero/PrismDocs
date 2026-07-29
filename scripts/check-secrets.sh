@@ -52,6 +52,13 @@
 
 set -euo pipefail
 
+# 把工作目录钉在仓库根。`git grep` 默认只搜当前目录往下，exclude pathspec 同样是相对当前目录的
+# ——从 src/ 调用时受检面从 114 个文件收窄到 14 个，而**消息与退出码与干净的全量运行完全相同**。
+# 这与本文件存在的理由是同一个失效形状：一条看不见目标的检查照样退出 0，没有人会察觉。
+# （CI 恰好从根调用，所以这不是当时的线上洞；直接跑脚本的开发者、将来的 pre-commit hook、
+#   或从子目录调的 just 拿到的是覆盖 14% 目录树的健康证明。）
+cd "$(git rev-parse --show-toplevel)"
+
 # 拆成两段拼接，避免在源码里直接写出成串的引号字面量。
 QUOTE="[\"']"
 NOT_QUOTE="[^\"']"
@@ -95,7 +102,18 @@ PATTERN="sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|github_pat_
 
 # 对受版本控制的文件跑一遍正则。
 scan() {
-  local hits
+  local hits files
+  # 烟雾下限，不是精确计数：仓库当前约 114 个受检文件，取 40 留足删文件的余量。
+  # 它守的是「作用域被收窄」这一类失效——上面那行 cd 是防线，这一条是防线失效时的报警器。
+  # 没有它，收窄后的运行仍然与干净的全量运行不可区分。
+  local floor=40
+
+  # 与下面 git grep 用的是同一条 exclude pathspec；两处若漂移，计数就不再是被扫的那一批。
+  files=$(git ls-files -- ':(exclude).planning/' | wc -l | tr -d '[:space:]')
+  if [ "$files" -lt "$floor" ]; then
+    echo "FAIL: scan surface implausibly small ($files < $floor version-controlled files) — 作用域被收窄了" >&2
+    return 1
+  fi
 
   # 排除集只剩一条。.planning/ 按设计要引用取样密钥——01-VERIFICATION.md § SC-4 的
   # 5 行取样表就是活证据，规划与验证文档不引用真实形态就没法讨论这个问题。
@@ -118,7 +136,8 @@ scan() {
     printf '%s\n' "$hits" >&2
     return 1
   fi
-  echo "OK: no plaintext secret in version-controlled files"
+  # 文件数进消息：「扫了多少」从此是每次运行都看得见的读数，而不是需要另外查证的事。
+  echo "OK: no plaintext secret in $files version-controlled files"
 }
 
 # 证明上面那条正则真的有判别力。不碰 git，纯字符串匹配。
