@@ -31,9 +31,25 @@ EGRESS_CRATES='reqwest|keyring-core|apple-native-keyring-store'
 
 # 成功标准 1-b：同一进程不得链接两份 SQLite / HTTP 栈。
 # --duplicates 只列多版本共存的包，命中即意味着 WAL 状态可能分叉。
+#
+# 这里刻意**不用** `|| true`。`check-secrets.sh` 的 scan 里那个 `|| true` 是**承重**的：
+# `git grep` 无命中时退出 1，吞掉它才能把「干净」与「失败」分开。而这一行被吞掉的恰好
+# 是失败本身——命令没跑起来 → `out` 为空串 → `grep` 什么都找不到 → 函数打 OK 返回 0，
+# 断言在它什么都没学到的时候报告成功。两者形态相同、性质相反，所以只能逐处判断，
+# 不存在「`|| true` 一律可用」或「一律禁用」的规则。
+#
+# 于是先接住退出码再看输出：`rc != 0` 说的是**这条断言没跑起来**，与「发现了重复」
+# 是两件完全不同的事，消息必须让读的人一眼分清（未来 cargo 改掉 --duplicates 这个
+# flag 名时，走的就是这条分支）。
 check_dup() {
-  local out
-  out=$(cargo tree --workspace --duplicates --edges normal || true)
+  local out rc=0
+  # 命令替换失败时不让 set -e 直接掐断函数——把退出码记进 rc 自己判。
+  out=$(cargo tree --workspace --duplicates --edges normal) || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "FAIL: \`cargo tree --workspace --duplicates\` could not run (exit $rc)" >&2
+    echo "      —— 这不是「发现了重复依赖」，是这条断言本身没跑起来，未提供任何证据。" >&2
+    return 1
+  fi
   if grep -Eq '^(rusqlite|reqwest|libsqlite3-sys) v' <<<"$out"; then
     echo "FAIL: duplicate critical crate in dependency tree" >&2
     grep -E '^(rusqlite|reqwest|libsqlite3-sys) v' <<<"$out" >&2

@@ -125,8 +125,9 @@ scan() {
   # 本脚本自身的排除也已取消——一个把自己排除在外的检查器就是个人人可写的盲区。
   #
   # `|| true` 在这里是**承重**的：git grep 无命中时退出 1，不吞掉它 set -e 会把「干净」
-  # 当成失败。它与 check-deps.sh 的 WR-11（`cargo tree … || true` 吞掉真实调用失败后
-  # grep 空串即报 OK）形态相同、性质相反：那里被吞的是失败，这里被吞的是干净。
+  # 当成失败。它与 check-deps.sh 的 `check_dup` 曾经那条 `cargo tree … || true`（吞掉真实
+  # 调用失败后 grep 空串即报 OK，记作 WR-11 / WR-04，已在 01-15 改为先接住退出码再判输出）
+  # 形态相同、性质相反：那里被吞的是失败，这里被吞的是干净。
   # 两者无法在这一行内区分，所以配套证明放在 selftest：一次被吞掉的调用失败会让 scan
   # 看到空串而报 OK，而 selftest 的阳性样本会当场不再命中而变红。
   hits=$(git grep -niE "$PATTERN" -- ':(exclude).planning/' || true)
