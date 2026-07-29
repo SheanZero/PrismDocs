@@ -243,7 +243,10 @@ mod tests {
         const USER_AND_PASS: &str =
             "https://prism-test-user:prism-test-secret-value@api.vendor.com/v1";
         const USER_ONLY: &str = "https://prism-test-user@api.vendor.com/v1";
-        const IN_QUERY: &str = "https://api.vendor.com/v1?api-key=prism-test-secret-value";
+        // 查询参数名刻意不叫 `api-key`：守卫拒的是「query 非空」而不是「query 里有 api-key」，
+        // 参数名对本断言无贡献；而带上它这条 fixture 会撞上 check-secrets.sh 的关键词分支。
+        // 撞车时改 fixture 不改防线（见 scripts/check-secrets.sh 文件头的单向约定）。
+        const IN_QUERY: &str = "https://api.vendor.com/v1?deployment=prism-test-secret-value";
         const IN_FRAGMENT: &str = "https://api.vendor.com/v1#prism-test-secret-value";
 
         // ① 纯函数拒绝。删掉 userinfo 分支 → 前两条重新通过；删掉 query/fragment 分支

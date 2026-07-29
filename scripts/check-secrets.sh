@@ -39,7 +39,11 @@ set -euo pipefail
 QUOTE="[\"']"
 NOT_QUOTE="[^\"']"
 
-# 四段 alternation。两个子命令共用这一个变量——不得复制第二份，
+# 裸值字符类：未加引号的赋值里，值一直延伸到第一个分隔符为止。
+# `.` `/` `+` 是 base64 / AWS secret access key 形态的常见字符，`~` `-` `_` 是 URL-safe 变体。
+BARE="[A-Za-z0-9_./+~-]"
+
+# 七段 alternation。两个子命令共用这一个变量——不得复制第二份，
 # 否则 selftest 测的是正则的副本，与 scan 实际用的那条可以静默漂移。
 #
 #   1. sk-…      字符类含连字符与下划线是本次修复的核心：Anthropic 的 sk-ant-api03-… 形态
@@ -47,9 +51,30 @@ NOT_QUOTE="[^\"']"
 #                放宽字符类后 16 会把普通的连字符标识符串扫进来。
 #   2. ghp_…     GitHub personal access token 前缀。
 #   3. AKIA…     AWS access key id 前缀，长度固定 16。
-#   4. 关键词赋值 在旧的 api_key 等号形态上扩了 secret / token / password 三个关键词
+#   4. github_pat_…  GitHub fine-grained PAT 前缀。ghp_ 只覆盖 classic token，
+#                    fine-grained 是另一个前缀且是 GitHub 现在的默认推荐形态。
+#   5. xox[baprs]-…  Slack 的五种 token 前缀（bot / app / 用户 / 刷新 / 旧式）。
+#   6. AIza…    Google API key 前缀。它与本项目「自定义 base_url 指向 OpenAI 兼容端点」
+#                是同一个使用面——用户把 Gemini 的兼容端点填进设置页时，密钥就是这个形状。
+#   7. 关键词赋值 在旧的 api_key 等号形态上扩了 secret / token / password 三个关键词
 #                与冒号赋值形态；git grep 带 -i，故 API_KEY / apiKey 两种大小写都进网。
-PATTERN="sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|(api[_-]?key|secret|token|password)[[:space:]]*[=:][[:space:]]*${QUOTE}${NOT_QUOTE}{8,}"
+#                值部分是**引号串或裸值两者取一**，两个长度下界刻意不同，裸值那个更高
+#                （8 vs 16）。这是本分支的核心权衡而非笔误：引号串本身已是一个强信号
+#                （有人刻意写了一个字面量），裸值没有这个信号——`token = someVar` /
+#                `secret: cfg.value` 这类普通标识符赋值在低下界上会大面积误报，
+#                而误报会让这条闸门被人绕开，绕开的闸门等于没有闸门。
+#                裸值那一半是 01-VERIFICATION.md § SC-4 记录的 blocker：
+#                .env / YAML / TOML / justfile / GitHub Actions `env:` 里的赋值不带引号，
+#                「配置中无明文密钥」那半句原先整类不可见。
+#
+#                **已知残留（不是遗漏，是这个下界的代价）**：01-VERIFICATION.md § SC-4
+#                取样表第 5 行 `password = hunter2hunter2` 的值只有 14 个字符，落在 16 之下，
+#                裸值形态下不命中（加引号的同一条在 selftest 阳性组里，经引号段的 8 命中）。
+#                8 行取样里其余 7 行全部命中。这是弱人类口令而非 API key/token——本闸门守的
+#                是成功标准 4 的密钥面。要改就得连同「裸值下界严格高于引号下界」一起重新论证，
+#                不要顺手把 16 调下去：取值为表达式的赋值（形如 `self.inner.value`）长度就在
+#                12–20 之间，下界一降它们就整片涌进来。
+PATTERN="sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{16,}|AIza[A-Za-z0-9_-]{30,}|(api[_-]?key|secret|token|password)[[:space:]]*[=:][[:space:]]*(${QUOTE}${NOT_QUOTE}{8,}|${BARE}{16,})"
 
 # 对受版本控制的文件跑一遍正则。
 scan() {
@@ -84,6 +109,7 @@ selftest() {
   # 阳性样本一律由片段拼出（见文件头的自扫约束）。阴性样本反而整串直写——
   # 它们本来就不该命中，直写正是要断言的那件事。
   local sk="sk" dash="-" ghp="ghp" us="_" aws="AKI" q='"'
+  local gh="github" pat="pat" xox="xox" aiz="AIza"
   local positive=() negative=() s failed=0
 
   # ——阳性组前五条：01-VERIFICATION.md § SC-4 的 5 行取样，旧正则只命中最后一条。
@@ -105,6 +131,11 @@ selftest() {
   positive+=("${ghp}${us}0123456789abcdefghijklmnopqr")
   positive+=("${aws}AIOSFODNN7EXAMPLE")
 
+  # ——阳性组：本次新入网的三种前缀（01-REVIEW.md CR-01 的 MISSED 清单后三条）。
+  positive+=("${gh}${us}${pat}${us}0123456789abcdefghijklmn")
+  positive+=("${xox}b${dash}123456789012${dash}1234567890123${dash}abcdefghijklmnop")
+  positive+=("${aiz}SyAabcdefghijklmnopqrstuvwxyz1234")
+
   # ——阳性组：长度阈值的下界。与阴性组同名的那条构成成对边界样本。
   positive+=("const k = ${q}${sk}${dash}abcdefghijklmnopqrst${q};")
 
@@ -114,7 +145,7 @@ selftest() {
 
   # ——阴性组：plan 01-10 新增的凭据型 URL fixture（userinfo / query / fragment 三面）。
   negative+=("const CREDENTIAL_URL: &str = \"https://prism-test-user:prism-test-secret-value@api.vendor.com/v1\";")
-  negative+=("const IN_QUERY: &str = \"https://api.vendor.com/v1?api-key=prism-test-secret-value\";")
+  negative+=("const IN_QUERY: &str = \"https://api.vendor.com/v1?deployment=prism-test-secret-value\";")
   negative+=("const IN_FRAGMENT: &str = \"https://api.vendor.com/v1#prism-test-secret-value\";")
 
   # ——阴性组：长度阈值的下界之下（恰好 19，比上面那条阳性样本少一个字符）。
