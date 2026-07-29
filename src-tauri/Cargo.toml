@@ -32,6 +32,10 @@ tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+# tracing 的全局 dispatcher 与 `RUST_LOG` 都是**进程级**状态，而 cargo 多线程跑测试
+# 二进制。碰这两样的测试必须串行，否则判别力会搭在「谁先跑」上（同 `01-RESEARCH.md`
+# § Pitfall 1 里 `keyring_core::set_default_store` 的那一类问题）。
+serial_test = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
