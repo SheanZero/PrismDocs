@@ -30,6 +30,23 @@
 #   放宽正则、加 allowlist、加整目录排除、降长度阈值——四者都算放宽，都不允许。
 #   （这条约定已由 secrets.rs 与 Settings.test.tsx 两处注释确立；本文件把它变成可执行断言。）
 #
+# 关键词分支的隔离样本（阳性组「隔离关键词分支」一节，两条）：
+#   它们存在的唯一目的是**隔离关键词分支**。其余取样样本的值都带 `sk-` 前缀，
+#   即使关键词分支整条失效它们仍会经前缀分支兜底命中——读起来像在覆盖裸值赋值，实际不是
+#   （01-REVIEW.md CR-01 记录的正是这个误导）。这两条的值里不含任何供应商前缀，
+#   因此只可能经关键词分支命中。
+#
+#   复现非恒真反证（照做，别只读结论）：
+#     1. 把 $PATTERN 关键词分支的值部分改回「引号必需」——即把结尾的
+#        `(${QUOTE}${NOT_QUOTE}{8,}|${BARE}{16,})` 换回 `${QUOTE}${NOT_QUOTE}{8,}`。
+#     2. `bash scripts/check-secrets.sh selftest` → 退出码必须是 1，
+#        且 stderr 的 `FAIL: positive sample not detected:` 行**恰好**是这两条。
+#     3. 既有的 5 行取样样本必须**不在**失败列表里（它们经 sk- 前缀分支命中，与本分支无关）。
+#     4. 把第 1 步改回去，再跑一次确认退出 0。
+#
+#   裸值下界的成对边界（阴性组末三条）：把裸值下界从 16 降到 8，
+#   selftest 必须当场变红——「顺手把阈值调下去」这个放宽动作因此有代价。
+#
 # 自扫约束：本脚本自身在 scan 的受检集合里。因此**任何新增的阳性样本都必须由片段拼出**，
 # 使源码里不出现命中自身正则的连续字面量。scan 退出 0 这件事本身就是该性质的证明。
 
@@ -110,6 +127,7 @@ selftest() {
   # 它们本来就不该命中，直写正是要断言的那件事。
   local sk="sk" dash="-" ghp="ghp" us="_" aws="AKI" q='"'
   local gh="github" pat="pat" xox="xox" aiz="AIza"
+  local tok="TOKEN" pw="pass" word="word"
   local positive=() negative=() s failed=0
 
   # ——阳性组前五条：01-VERIFICATION.md § SC-4 的 5 行取样，旧正则只命中最后一条。
@@ -139,6 +157,15 @@ selftest() {
   # ——阳性组：长度阈值的下界。与阴性组同名的那条构成成对边界样本。
   positive+=("const k = ${q}${sk}${dash}abcdefghijklmnopqrst${q};")
 
+  # ——阳性组：隔离关键词分支（见文件头同名小节）。
+  #   值里不含任何供应商前缀，因此只可能经关键词分支的**裸值**那一半命中：
+  #   把关键词分支改回「引号必需」，红的必须恰好是这两条。
+  #   第一条是本项目自己的第二个密钥在配置文件里的形态（docs/keychain-naming.md
+  #   的 account 名 mcp_bearer_token，大写形态 + 32 位十六进制值）；
+  #   第二条是 YAML 裸值赋值，值 16 位纯字母——恰好压在裸值下界上。
+  positive+=("MCP_BEARER_${tok}=7f3a9c1e5b2d8f4a6c0e9b7d3f1a5c8e")
+  positive+=("${pw}${word}: abcdefghijklmnop")
+
   # ——阴性组前两条：既有 fixture，扫描器不得为了迁就它们而放宽（反之亦然）。
   negative+=("const FIXTURE_SECRET: &str = \"prism-test-secret-value\";")
   negative+=("const FAKE_KEY = \"fixture-not-a-real-credential\";")
@@ -153,6 +180,13 @@ selftest() {
 
   # ——阴性组：阈值从 16 提到 20 挡下的那类东西。放宽字符类后它在 16 下会命中。
   negative+=("const mode = \"sk-dev-mode-fallback\";")
+
+  # ——阴性组：裸值下界的成对边界。第一条的值是 15 个字符，比下界少一个，
+  #   与上面那条 16 位纯字母的阳性样本构成一对；后两条是裸值下界真正挡的东西
+  #   ——取值为标识符/表达式的普通赋值。把下界从 16 降到 8，这一组当场变红。
+  negative+=("token = abcdefghijklmno")
+  negative+=("let token = someVar;")
+  negative+=("secret: cfg.value")
 
   # 逐条喂样本一律用 herestring，**不得用管道**：pipefail 下 `grep -q` 命中即早退，
   # 写端拿到 SIGPIPE 后管道整体的退出码会掩盖判定结果，断言静默恒绿。
