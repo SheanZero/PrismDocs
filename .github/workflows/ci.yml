@@ -31,8 +31,10 @@ jobs:
       - name: Dependency-direction assertions
         run: bash scripts/check-deps.sh all
 
-      - name: Plaintext secret scan
-        run: bash scripts/check-secrets.sh
+      # 显式写 all（= selftest + scan）而不是靠无参数默认值：默认值哪天改回 scan-only，
+      # CI 会静默失去 selftest 那一半并照常绿——而 selftest 正是「扫描器没瞎」的唯一证据。
+      - name: Plaintext secret scan (pattern selftest + repo scan)
+        run: bash scripts/check-secrets.sh all
 
       - name: Clippy (engine selection set)
         run: cargo clippy -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine -- -D warnings

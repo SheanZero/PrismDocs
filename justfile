@@ -20,14 +20,19 @@ check-no-cycle:
 check-single-egress:
     bash scripts/check-deps.sh single-egress
 
-# 成功标准 4：受版本控制的文件里无明文密钥
+# 成功标准 4：正则的判别力自证（selftest）+ 受版本控制的文件里无明文密钥（scan）。
+# 显式写 all 而不是靠无参数默认值：默认值哪天改回 scan-only，闸门会静默失去 selftest 那一半。
 check-secrets:
-    bash scripts/check-secrets.sh
+    bash scripts/check-secrets.sh all
 
-# 四条依赖方向断言 + 密钥静态检查（CI 的 engine job 跑的就是这两条）
+# 只跑判别力自证那一半（改正则时的快速回路，不碰 git）
+check-secrets-selftest:
+    bash scripts/check-secrets.sh selftest
+
+# 六条依赖方向断言 + 密钥静态检查两半（CI 的 engine job 跑的就是这两条）
 check-all:
     bash scripts/check-deps.sh all
-    bash scripts/check-secrets.sh
+    bash scripts/check-secrets.sh all
 
 # D-01 的证据形态：engine 选择集单独可测（不是 --workspace，那会编译 shell）
 test-engine:
