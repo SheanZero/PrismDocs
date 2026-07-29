@@ -4,15 +4,15 @@ milestone: v0.2
 milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
-status: executing
-stopped_at: Completed 01-12-PLAN.md
-last_updated: "2026-07-29T05:45:09.509Z"
+status: ready_to_execute
+stopped_at: Completed 01-12-PLAN.md; planned second gap-closure round (01-14..01-28)
+last_updated: "2026-07-29T07:35:00.000Z"
 last_activity: 2026-07-29
-last_activity_desc: Phase 01 execution started
+last_activity_desc: Phase 01 second gap-closure round planned (15 plans, 01-14..01-28)
 progress:
   total_phases: 1
-  completed_phases: 1
-  total_plans: 13
+  completed_phases: 0
+  total_plans: 28
   completed_plans: 13
 ---
 
@@ -27,12 +27,18 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 13 of 13（13 已完成，12 尚未执行——本 phase 唯一剩余的 plan）
+Phase: 01 (foundation-skeleton) — PLANNED (第二轮缺口修补)
+Plan: 13 of 28（01-01..01-13 已执行；01-14..01-28 为第二轮缺口修补集，尚未执行）
 Status: Ready to execute
-Last activity: 2026-07-29 — Phase 01 execution started
+Last activity: 2026-07-29 — 第二轮缺口修补集规划完成（15 份计划，6 波）
 
-Progress: [██████████] 100%
+Progress: [████░░░░░░] 46%
+
+**为什么 Phase 1 尚未 Complete：** `01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
+的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
+TOML / CI `env:`）整类不可见，而这正是「代码与**配置**中无明文密钥」里「配置」那一半。**状态为真**
+（三组独立宽扫确认当前仓库零明文密钥），失守的是执行机制。`01-14` 单独成波关闭它。
+其余 14 份处理两轮评审累积的 36 条 warning/info（用户定的范围：全部清干净再进 Phase 2）。
 
 ## Performance Metrics
 
