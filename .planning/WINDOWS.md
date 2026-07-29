@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 10
+open_count: 9
 waived_count: 0
-fixed_count: 0
+fixed_count: 1
 total_count: 10
-last_updated: 2026-07-29T13:10:05.615Z
+last_updated: 2026-07-29T13:22:54.127Z
 ---
 
 # Broken Windows Ledger
@@ -24,7 +24,7 @@ last_updated: 2026-07-29T13:10:05.615Z
 | 7 | 01 | deviation | scripts/check-secrets.sh |  | INFRA-03 未勾：需求文本「支持 Anthropic/OpenAI 兼容端点」半句需 Phase 4 chat client；扫描器与写入侧两半已关闭 | open |  | 2026-07-29T04:11:54.094Z |  |
 | 8 | 01 | unrun-verify | src-tauri/tauri.conf.json |  | 01-13 Task 1 的 <human-check> 五步（真实 WebView + dmg 两形态的 CSP 验证）未执行，顺延至 end-of-phase 人工验证 | open |  | 2026-07-29T05:34:36.523Z |  |
 | 9 | 01 | unrun-verify | src-tauri/src/lib.rs |  | 01-13 Task 3 的行为断言未执行：tauri dev 终端是否真的打出 settings.rs 的明文 http 告警（sink 非空的端到端证据） | open |  | 2026-07-29T05:34:36.571Z |  |
-| 10 | 01 | deviation | src/pages/Settings.tsx |  | Settings.tsx 的成功通知不在任何 live region 里（NoticeLine 的 ok 分支只有颜色无 role），读屏对「已保存」完全静默——同一条 IN-06 推理，本 plan 范围外未动 | open |  | 2026-07-29T13:10:05.615Z |  |
+| 10 | 01 | deviation | src/pages/Settings.tsx |  | Settings.tsx 的成功通知不在任何 live region 里（NoticeLine 的 ok 分支只有颜色无 role），读屏对「已保存」完全静默——同一条 IN-06 推理，本 plan 范围外未动 | fixed |  | 2026-07-29T13:10:05.615Z | 2026-07-29T13:22:54.127Z |
 
 ````json
 [
@@ -143,10 +143,10 @@ last_updated: 2026-07-29T13:10:05.615Z
     "file": "src/pages/Settings.tsx",
     "line": null,
     "description": "Settings.tsx 的成功通知不在任何 live region 里（NoticeLine 的 ok 分支只有颜色无 role），读屏对「已保存」完全静默——同一条 IN-06 推理，本 plan 范围外未动",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-07-29T13:10:05.615Z",
-    "resolved_at": null
+    "resolved_at": "2026-07-29T13:22:54.127Z"
   }
 ]
 ````

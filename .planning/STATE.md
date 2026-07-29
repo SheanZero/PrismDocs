@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-22-PLAN.md
-last_updated: "2026-07-29T13:10:00.816Z"
+stopped_at: Completed 01-23-PLAN.md
+last_updated: "2026-07-29T13:23:05.333Z"
 last_activity: 2026-07-29
 last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 20 of 28（01-01..01-16 已执行；下一份 01-17）
+Plan: 21 of 28（01-01..01-16 已执行；下一份 01-17）
 Status: Ready to execute
 Last activity: 2026-07-29 — 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 
-Progress: [███████░░░] 71%
+Progress: [████████░░] 75%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -86,6 +86,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P20 | ~20min | 2 tasks | 2 files |
 | Phase 01 P21 | ~40min | 3 tasks | 3 files |
 | Phase 01 P22 | ~25min | 2 tasks | 4 files |
+| Phase 01 P23 | 9min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 冒烟流上界夹紧点放在不依赖 tauri 的 smoke::generate 内部（经 clamp_total），命令层只在文档注释里指向它——两处各夹一次会让「哪一个承重」含糊
 - [Phase ?]: 「上界必须高于冒烟页默认值」写成 const _: () = assert!(...) 编译期断言而非单测：clippy assertions_on_constants 拒绝常量间的运行期 assert，且编译期形态更强
 - [Phase ?]: spawn_blocking 落点用函数体切片型源码断言而非 Handle::try_current() 行为探针：探针答案取决于 tauri::async_runtime 的后端实现，钉住它等于埋一颗随上游升级而红的雷
+- [Phase ?]: 01-23: errorCopy 的查找表建在 Object.create(null) 之上（机制），而不是靠每个查找点写 Object.hasOwn（约定）
+- [Phase ?]: 01-23: 前端 URL 判定一律先解析后看结构，不做字节级前缀比较；与 engine validate_base_url 的一致性用临时跨语言对照测试取证（跑完即删）
+- [Phase ?]: 01-23: API key 在前端 submitKey 与 prism_llm::secrets::set_api_key 两端走同一份 trim（与 01-16 McpDeps::new 同源）
 
 ### Pending Todos
 
@@ -197,6 +201,7 @@ None yet.
 - [Phase 2+ 每次新增 fixture / 测试局部变量]: 名字像密钥的标识符后跟一个引号串会被 `scripts/check-secrets.sh` 抓住，这是它该抓的形状。撞车时改 fixture 的名字或值，**不动扫描器**——放宽正则 / 加 allowlist / 加整目录排除 / 降长度阈值四者都算放宽。判断标准：若某个改动会让 selftest 的某条阴性样本被误命中、或某条阳性样本不再命中，那就是在放宽防线
 - [Phase 1 收尾人工验证]: 01-13 Task 1 的 <human-check> 五步未执行（human_verify_mode: end-of-phase）。CSP 只在真实 WebView 里生效，jsdom 与 cargo test 都看不见它——npm run tauri dev 非白屏 / 设置页完整 / 冒烟页三入口 / Console 无 CSP 违规 / tauri build 的 dmg 重复验证（发布形态走 csp 而非 devCsp，是验证严格那一份的唯一路径）。顺带确认 tracing sink 非空：base_url 设成非 loopback 的 http 端点，终端应出现 settings.rs 的明文 http 告警。出现违规时只放宽 devCsp 或按报告点名的指令逐项追加，禁止设回 null
 - Phase 6 注入 MCP bearer 时不得 unwrap McpDeps::new 的 Err：按 D-06 须降级为「MCP 服务不启动 + 一条 warn」，否则「token 没配」会从开着的门变成启动崩溃（T-01-54）
+- INFRA-03 concurrency 探针未覆盖（flagged assumption）：keyring_core::set_default_store 是进程全局，并发写同一 keychain account 的行为无任何断言；secrets.rs 全部测试 #[serial] 是在回避而非回答。Phase 4 接上真实 chat client 时需补一条覆盖它的测试。
 
 ## Deferred Items
 
@@ -208,6 +213,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T13:10:00.806Z
-Stopped at: Completed 01-22-PLAN.md
+Last session: 2026-07-29T13:23:05.324Z
+Stopped at: Completed 01-23-PLAN.md
 Resume file: None
