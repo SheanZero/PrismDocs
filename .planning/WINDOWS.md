@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 10
+open_count: 12
 waived_count: 0
 fixed_count: 1
-total_count: 11
-last_updated: 2026-07-29T13:32:35.552Z
+total_count: 13
+last_updated: 2026-07-29T14:00:06.558Z
 ---
 
 # Broken Windows Ledger
@@ -26,6 +26,8 @@ last_updated: 2026-07-29T13:32:35.552Z
 | 9 | 01 | unrun-verify | src-tauri/src/lib.rs |  | 01-13 Task 3 的行为断言未执行：tauri dev 终端是否真的打出 settings.rs 的明文 http 告警（sink 非空的端到端证据） | open |  | 2026-07-29T05:34:36.571Z |  |
 | 10 | 01 | deviation | src/pages/Settings.tsx |  | Settings.tsx 的成功通知不在任何 live region 里（NoticeLine 的 ok 分支只有颜色无 role），读屏对「已保存」完全静默——同一条 IN-06 推理，本 plan 范围外未动 | fixed |  | 2026-07-29T13:10:05.615Z | 2026-07-29T13:22:54.127Z |
 | 11 | 01 | deviation | src-tauri/tauri.conf.json |  | 发布 csp 的 style-src 仍带 'unsafe-inline'（React 内联 style 属性），使 01-24 plan 要求的「csp 整串不含 unsafe-inline」不可满足；已改写为「含该 token 的指令集合精确等于 [style-src ...]」，但这条发布形态的放宽本身未被消除 | open |  | 2026-07-29T13:32:35.552Z |  |
+| 12 | 01 | deviation | crates/prism-engine/src/services.rs |  | Engine::list_feedback 的空 project_id 校验无端到端哨兵：01-17 在 PrismHandler 加的 projectId 校验集合覆盖了它（同为 trim().is_empty()），MCP 线上不存在能引出 engine 校验文本的输入；判别性已搬到 facade.rs 对 Arc<dyn FeedbackSource> 的直接调用 | open |  | 2026-07-29T14:00:06.507Z |  |
+| 13 | 01 | deviation | .planning/phases/01-foundation-skeleton/01-REVIEW.md |  | 01-REVIEW.md WR-03 第 2 点举的可达性例子 Host: 127.0.0.1:notanumber 实测不成立（http 1.x 的 Authority::try_from 接受非数字端口）；真正分叉的是 127.0.0.1:80/evil 与 127.0.0.1:80@evil.com，已在 01-17 更正并落测 | open |  | 2026-07-29T14:00:06.558Z |  |
 
 ````json
 [
@@ -159,6 +161,30 @@ last_updated: 2026-07-29T13:32:35.552Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-29T13:32:35.552Z",
+    "resolved_at": null
+  },
+  {
+    "id": 12,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "crates/prism-engine/src/services.rs",
+    "line": null,
+    "description": "Engine::list_feedback 的空 project_id 校验无端到端哨兵：01-17 在 PrismHandler 加的 projectId 校验集合覆盖了它（同为 trim().is_empty()），MCP 线上不存在能引出 engine 校验文本的输入；判别性已搬到 facade.rs 对 Arc<dyn FeedbackSource> 的直接调用",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T14:00:06.507Z",
+    "resolved_at": null
+  },
+  {
+    "id": 13,
+    "kind": "deviation",
+    "phase": "01",
+    "file": ".planning/phases/01-foundation-skeleton/01-REVIEW.md",
+    "line": null,
+    "description": "01-REVIEW.md WR-03 第 2 点举的可达性例子 Host: 127.0.0.1:notanumber 实测不成立（http 1.x 的 Authority::try_from 接受非数字端口）；真正分叉的是 127.0.0.1:80/evil 与 127.0.0.1:80@evil.com，已在 01-17 更正并落测",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T14:00:06.558Z",
     "resolved_at": null
   }
 ]
