@@ -99,6 +99,24 @@ describe("SettingsPage / API key", () => {
     await waitFor(() => expect(setApiKey).toHaveBeenCalledWith(FAKE_KEY));
   });
 
+  // 被拒的查询在 TanStack Query v5 里以 `isPending === false` + `data === undefined` 落定，
+  // 于是「`data ? 已配置 : 未配置`」会**肯定地**声称没有配置密钥——而实际是钥匙串被锁、
+  // 权限被拒或 IPC 失败。用户对「未配置」的反应是重新输入密钥，那次保存也会失败，
+  // 且他仍不知道原因。
+  it("says 读取失败 rather than 未配置 when the key status query is rejected", async () => {
+    apiKeyStatus.mockRejectedValue(new Error("keychain is locked"));
+    renderPage();
+
+    expect(await screen.findByText(/读取失败/)).toBeTruthy();
+    // 判别性所在：只断言「出现了读取失败」的话，一个同时还显示「未配置」的实现也会绿。
+    expect(screen.queryByText(/未配置/)).toBeNull();
+
+    const alert = await screen.findByRole("alert");
+    // 文案等于 `errorCopy` 的产物，而不是 `String(error)`——错误对象里可能带着不该露面的东西。
+    expect(alert.textContent).toBe("操作失败，请重试。");
+    expect(alert.textContent ?? "").not.toContain("keychain is locked");
+  });
+
   it("translates a keychain failure into Chinese copy instead of the raw code", async () => {
     setApiKey.mockRejectedValue("secret_error");
     renderPage();
@@ -223,6 +241,29 @@ describe("SettingsPage / base_url", () => {
     }
     // engine 侧的守卫不该是用户第一次听说这件事的地方。
     expect(setBaseUrl).not.toHaveBeenCalled();
+  });
+
+  it("does not claim 未设置 when the endpoint query is rejected", async () => {
+    getSetting.mockRejectedValue(new Error("db is unreadable"));
+    renderPage();
+
+    expect(await screen.findByText(/读取失败/)).toBeTruthy();
+    expect(screen.queryByText(/（未设置）/)).toBeNull();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("操作失败，请重试。");
+    expect(alert.textContent ?? "").not.toContain("db is unreadable");
+  });
+
+  // 阴性对照：真的没设置与读失败必须**可区分**。少了这一条，一个无条件显示
+  // 「读取失败」的实现会让上面那条绿——而它把一个完全正常的空状态说成了故障。
+  it("still says （未设置） when the endpoint query resolves to null", async () => {
+    getSetting.mockResolvedValue(null);
+    renderPage();
+
+    expect(await screen.findByText(/（未设置）/)).toBeTruthy();
+    expect(screen.queryByText(/读取失败/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   // D-16a / D-06：LLM 配置可跳过。页面在**没有任何密钥**时仍要完整渲染，
