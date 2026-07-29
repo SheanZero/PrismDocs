@@ -75,11 +75,23 @@ check_tauri_free() {
 # 成功标准 1-c（D-09）：MCP 服务端不得反向依赖 facade。
 # 必须是 --edges normal：cargo 允许「A→B 普通 + B→A dev」这种环存在且普通编译不报错，
 # dev 边是这条约束唯一的逃逸口，断言里显式排除它。
+#
+# 为什么是 `^prism-engine ` 带一个尾随空格而不是裸前缀：`--prefix none` 的每行形如
+# `<name> v<version>`，包名与版本之间必然有一个空格，所以尾随空格就是包名的右边界。
+# 裸前缀 `^prism-engine` 会把任何同前缀的**别的** crate 一并吸收（`prism-engine-core`、
+# `prism-engineering`）——本处实测方向是**过敏**：追加一行 `prism-engine-core v0.1.0`
+# 后裸前缀命中（把一个别的 crate 报成环），尾随空格不命中。下面两处 offenders 抽取
+# 的裸前缀则是**截断**（`prism-mcp2` 被折成 `prism-mcp`），方向相反、根因同一个：
+# 包名没有锚定到边界。
+#
+# 代价要写明：将来若真的拆出一个 facade 层的新 crate（比如 prism-engine-core），
+# 它不会再因为名字前缀相同而被这一条顺带看住——**必须显式加进这里**，
+# 不要依赖前缀巧合来提供覆盖。
 check_no_cycle() {
   local out body
   out=$(cargo tree -p prism-mcp --edges normal --prefix none)
   body=$(printf '%s\n' "$out" | tail -n +2)
-  if grep -q '^prism-engine' <<<"$body"; then
+  if grep -q '^prism-engine ' <<<"$body"; then
     echo "FAIL: prism-mcp depends on prism-engine" >&2
     return 1
   fi
@@ -128,8 +140,13 @@ check_facade_egress() {
       continue
     fi
     inverted=$(cargo tree -p prism-engine --edges normal --invert "$c" --prefix none)
-    offenders=$(grep -oE '^prism-[a-z]+' <<<"$inverted" \
-                | sort -u | grep -vE '^(prism-llm|prism-engine)$' || true)
+    # 抽到尾随空格为止（字符类同时含数字与连字符），再去掉空格进 sort：
+    # 裸前缀 `^prism-[a-z]+` 会把 `prism-mcp2 v0.1.0` **截断**成 `prism-mcp`——
+    # 一个真违规被折叠成一个合法邻居的名字，报出来的名字指向一个无辜的 crate。
+    # 去空格必须在 allowlist 过滤**之前**，否则 `prism-llm ` 带着空格与 `^prism-llm$` 不等，
+    # 合法者会被当成违规。
+    offenders=$(grep -oE '^prism-[a-z0-9-]+ ' <<<"$inverted" \
+                | sed 's/ $//' | sort -u | grep -vE '^(prism-llm|prism-engine)$' || true)
     if [ -n "$offenders" ]; then
       echo "FAIL: $c reaches prism-engine through a crate other than prism-llm:" >&2
       echo "$offenders" >&2
@@ -166,8 +183,10 @@ check_shell_egress() {
       continue
     fi
     inverted=$(cargo tree -p prismdocs-shell --edges normal --invert "$c" --prefix none)
-    offenders=$(grep -oE '^prism-[a-z]+' <<<"$inverted" \
-                | sort -u | grep -vE '^(prism-llm|prism-engine)$' || true)
+    # 与 check_facade_egress 同一口径：抽到尾随空格为止再去空格，
+    # 否则 `prism-mcp2` 会被截断成 allowlist 邻域里的 `prism-mcp`。见上一处的完整理由。
+    offenders=$(grep -oE '^prism-[a-z0-9-]+ ' <<<"$inverted" \
+                | sed 's/ $//' | sort -u | grep -vE '^(prism-llm|prism-engine)$' || true)
     if [ -n "$offenders" ]; then
       echo "FAIL: $c reaches prismdocs-shell through a crate other than prism-llm:" >&2
       echo "$offenders" >&2
