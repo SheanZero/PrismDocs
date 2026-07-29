@@ -24,9 +24,27 @@ const INSERT_PROJECT: &str =
 const COUNT_PROJECTS: &str = "SELECT count(*) FROM projects";
 const INSERT_SETTING: &str = "INSERT INTO settings(key,value,updated_at) VALUES('x','y',0)";
 
-/// WAL 下读者持有的是快照，写者不被它阻塞——两边都不该看到 `SQLITE_BUSY`。
+/// 写者在读者持有池连接期间提交，两边都不该看到 `SQLITE_BUSY`。
+///
+/// 三件事必须说清楚，否则这条测试会再次长成「名字承诺一件事、断言守着另一件」的形态：
+///
+/// 1. **它真正独有的价值**是「读者从池里借出一条连接、还没归还时，写者仍能提交且不超时」
+///    ——WAL 单写者 + 只读池的核心性质。判别性断言是第二次读得到 **2**：
+///    读的可见性语义变了（例如闭包内改成持事务），这条立刻红。
+/// 2. `Store::read` **不**提供跨闭包的快照隔离：它从池里取一条连接就直接调闭包
+///    （`open.rs::read`），从不显式开事务，因此闭包里每条 `query_row` 都在 autocommit 下
+///    取一份新快照——第二次读**看得见**期间提交的那一行。
+/// 3. 若将来设计确实需要闭包内快照隔离，必须**先实现**（`conn.unchecked_transaction()` +
+///    `TransactionBehavior::Deferred`，并在闭包期间持有）**再断言**，不得反过来。
+///    反过来就是上轮 WR-01 的原样：注释与测试名描述了一个不存在的性质，
+///    而唯一让三者不撞车的东西是一条被削弱到恒真的断言（`assert!(after >= 1)`）。
+///
+/// **判别力边界（实测，见 01-19-SUMMARY 反证 B）**：因为闭包里的读走 autocommit、
+/// 语句一结束就放锁，「写者不被阻塞」这一条在**任何** journal 模式下都成立——
+/// 它只有在读者持一个未提交的读事务时才有判别力。这条测试守的是「今天的 `read()` 形态下
+/// 二者并发不互相踩」；真正把 WAL 的必要性钉住的是 `open.rs::open_leaves_the_database_in_wal_mode`。
 #[test]
-fn reader_snapshot_is_isolated() {
+fn writer_commits_while_a_reader_holds_a_pooled_connection() {
     let dir = tempfile::tempdir().expect("tempdir");
     let store = Arc::new(prism_store::open(&dir.path().join("t.db")).expect("open store"));
 
@@ -46,7 +64,7 @@ fn reader_snapshot_is_isolated() {
                 let before: i64 = c.query_row(COUNT_PROJECTS, [], |r| r.get(0))?;
                 tx_started.send(()).expect("signal reader started");
                 rx_go.recv().expect("wait for the writer");
-                // 写已经提交了；同一个读连接仍在自己的事务快照里。
+                // 写已经提交；这一读在 autocommit 下取新快照，因此看得见它。
                 let after: i64 = c.query_row(COUNT_PROJECTS, [], |r| r.get(0))?;
                 Ok((before, after))
             })
@@ -65,7 +83,9 @@ fn reader_snapshot_is_isolated() {
 
     let (before, after) = reader.join().expect("reader thread");
     assert_eq!(before, 1, "读者起手应看到第一行");
-    assert!(after >= 1, "读者不应因并发写而丢失可见行");
+    // 判别点：`Store::read` 的闭包不持事务，第二次读必须看见期间提交的那一行。
+    // 写成 `>= 1` 就是恒真（before 已断言为 1，行只增不减），那正是上轮 WR-01。
+    assert_eq!(after, 2, "autocommit 下的第二次读应看见期间提交的那一行");
 
     let total: i64 = store
         .read(|c| Ok(c.query_row(COUNT_PROJECTS, [], |r| r.get(0))?))
