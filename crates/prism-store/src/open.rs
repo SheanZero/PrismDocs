@@ -164,6 +164,37 @@ mod tests {
     ///
     /// 顺序本身仍然重要：它是 writer-first 序列里唯一没有运行期兜底的一步。既然没有
     /// 行为面的哨兵，就在这里放一个结构面的。
+    /// WAL 是这个 crate 每一条并发性质的前提，而 SQLite 用**返回行**而不是错误告知结果模式：
+    /// WAL 起不来时它返回 `delete`，`execute_batch` 照样报告成功。这条守的是「open() 之后
+    /// 库确实处在 WAL 下」。
+    #[test]
+    fn open_leaves_the_database_in_wal_mode() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = super::open(&dir.path().join("t.db")).expect("open store");
+        let mode: String = store
+            .read(|c| Ok(c.query_row("PRAGMA journal_mode", [], |r| r.get(0))?))
+            .expect("query journal_mode");
+        assert!(
+            mode.eq_ignore_ascii_case("wal"),
+            "expected journal_mode=wal after open(), got {mode}"
+        );
+    }
+
+    /// T-01-20：错误会跨 IPC 边界到达前端 DOM，库路径是内部事实。
+    /// 形态沿用 `commands.rs::mapped_errors_do_not_carry_lower_layer_text`。
+    #[test]
+    fn journal_mode_error_carries_no_path() {
+        let text = crate::error::StoreError::JournalModeNotWal("delete".to_owned()).to_string();
+        assert!(
+            !text.contains('/'),
+            "journal-mode error must not carry a path: {text}"
+        );
+        assert!(
+            text.contains("delete"),
+            "journal-mode error should name the mode it actually got: {text}"
+        );
+    }
+
     #[test]
     fn migration_runs_before_the_read_pool_is_built() {
         let source = include_str!("open.rs");
