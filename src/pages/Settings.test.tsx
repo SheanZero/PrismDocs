@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // 工厂体内只**引用**而不解引用这些 spy（vi.mock 提升到静态 import 之上，提前解引用会撞 TDZ）。
@@ -37,6 +37,10 @@ function renderPage() {
   );
   return render(<SettingsPage />, { wrapper });
 }
+
+// vitest 的 globals 未开启，Testing Library 的自动清理不会注册——不显式 cleanup
+// 就会把上一条测试的 DOM 留在 document 里，随后 getByRole 报 "Found multiple elements"。
+afterEach(cleanup);
 
 beforeEach(() => {
   for (const spy of [apiKeyStatus, setApiKey, deleteApiKey, getSetting, setBaseUrl]) {

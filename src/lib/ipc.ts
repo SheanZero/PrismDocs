@@ -30,10 +30,36 @@ export interface SearchHit {
   relPath: string;
 }
 
+/// `settings` 表里 LLM 端点的键名（Rust 侧 `prism_store::settings::SETTING_BASE_URL`）。
+export const SETTING_BASE_URL = "llm.base_url";
+
+// ---------------------------------------------------------------- 错误码 → 文案
+//
+// 命令的错误是**稳定短码串**，不是给人读的句子。短码是给代码分支用的契约；
+// 面向用户的文案在这里生成，且**从不把码串本身放进 UI**——那既没用也是内部细节。
+
+const ERROR_COPY: Record<string, string> = {
+  invalid_url: "链接必须以 http:// 或 https:// 开头，并带有主机名。",
+  invalid_setting: "这个配置项不被接受（疑似密钥的键名一律不入库）。",
+  store_error: "写入本地数据库失败，请重试。",
+  secret_error: "系统钥匙串当前不可用，密钥没有保存。",
+  task_failed: "后台任务没能完成，请重试。",
+  channel_send_failed: "数据流通道已关闭。",
+  engine_error: "引擎遇到一个内部错误。",
+};
+
+/// 把命令错误译成中文文案。
+///
+/// 无法识别时给的是**通用**兜底，而不是 `String(err)`：把未知内容原样渲染进 DOM
+/// 正是「内部细节泄漏到界面」的常见入口，而错误对象里可能恰好带着不该露面的东西。
+export function errorCopy(err: unknown): string {
+  const code = typeof err === "string" ? err : "";
+  return ERROR_COPY[code] ?? "操作失败，请重试。";
+}
+
 // ---------------------------------------------------------------- 命令封装
 //
-// 每个函数一行 invoke。命令的错误是**稳定短码串**（invalid_url / store_error /
-// secret_error …），不是给人读的句子——调用方据码分支并自己出中文文案。
+// 每个函数一行 invoke。
 
 export async function devPing(): Promise<string> {
   return await invoke<string>("dev_ping");
@@ -55,6 +81,11 @@ export async function apiKeyStatus(): Promise<boolean> {
   return await invoke<boolean>("api_key_status");
 }
 
+/// 删除已保存的密钥。幂等：已不存在视为已删除。
+export async function deleteApiKey(): Promise<void> {
+  await invoke("delete_api_key");
+}
+
 export async function getSetting(key: string): Promise<string | null> {
   return await invoke<string | null>("get_setting", { key });
 }
@@ -68,6 +99,11 @@ export async function devEmitBusEvent(
   docId: string,
 ): Promise<void> {
   await invoke("dev_emit_bus_event", { projectId, docId });
+}
+
+/// 写入样例文档，返回它们所属的 project id（由引擎给出，前端不另抄常量）。
+export async function devSeedSampleDocs(): Promise<string> {
+  return await invoke<string>("dev_seed_sample_docs");
 }
 
 /// Channel 由**前端**创建后作为命令参数传入——这条通路只适合请求作用域的流。
