@@ -127,6 +127,40 @@ describe("SettingsPage / base_url", () => {
     expect(await screen.findByText(/已保存/)).toBeTruthy();
   });
 
+  // 凭据藏在**值**里：`llm.base_url` 这个键名再正常不过，而 `https://u:key@host/v1`
+  // 里的那串东西会被原样提交。权威守卫在 engine 的 set_setting 写入路径上（01-10 Task 1），
+  // 这一层只是让用户在按下保存之前就知道那串东西不该填在这里。
+  //
+  // 两条断言缺一不可（同 72-80 的范式）：只有 ① 时，一个**根本没提交表单**的组件也会通过；
+  // 只有 ② 时，一个「按钮坏了」的组件也会通过。
+  it("rejects a credential-bearing endpoint before it ever reaches the engine", async () => {
+    const CREDENTIAL_URL = `https://u:${FAKE_KEY}@api.vendor.com/v1`;
+    renderPage();
+
+    const input = (await screen.findByLabelText(/LLM 端点/)) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: CREDENTIAL_URL } });
+    fireEvent.click(screen.getByRole("button", { name: /保存端点/ }));
+
+    // ① 本地就给出了专属文案（中文规则文案，不是原始码串）。
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent ?? "").toMatch(/用户名|密码/);
+    expect(alert.textContent ?? "").not.toContain("invalid_url_credentials");
+
+    // ② 一次 IPC 都没发出去——engine 侧的守卫不该是用户第一次听说这件事的地方。
+    expect(setBaseUrl).not.toHaveBeenCalled();
+
+    // ③ 文案不回显输入（T-01-26 同源）：被误填进端点栏的很可能就是密钥本身。
+    expect(alert.textContent ?? "").not.toContain(FAKE_KEY);
+
+    // ④ 阴性对照：守卫若写成「一律拒绝」，上面三条也都会绿——而那会把设置页彻底废掉。
+    fireEvent.change(input, { target: { value: "https://api.example.com/v1" } });
+    fireEvent.click(screen.getByRole("button", { name: /保存端点/ }));
+    await waitFor(() =>
+      expect(setBaseUrl).toHaveBeenCalledWith("https://api.example.com/v1"),
+    );
+    expect(setBaseUrl).toHaveBeenCalledTimes(1);
+  });
+
   // D-16a / D-06：LLM 配置可跳过。页面在**没有任何密钥**时仍要完整渲染，
   // 不弹不可关闭的引导、不把用户挡在别处。
   it("stays fully usable with no key configured", async () => {
