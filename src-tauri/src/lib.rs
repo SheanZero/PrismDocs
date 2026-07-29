@@ -5,6 +5,7 @@
 
 pub mod bus_adapter;
 pub mod commands;
+pub mod smoke;
 
 use std::sync::Arc;
 

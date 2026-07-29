@@ -3089,8 +3089,10 @@ dependencies = [
  "prism-store",
  "prism-types",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
+ "tempfile",
  "tokio",
  "tracing",
 ]

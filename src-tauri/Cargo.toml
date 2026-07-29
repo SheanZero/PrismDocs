@@ -26,5 +26,9 @@ serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 
+[dev-dependencies]
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+
 [features]
 test = ["tauri/test"]
