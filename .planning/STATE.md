@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-09-PLAN.md（phase 01 全部 9 个 plan 执行完毕，待 verify）
-last_updated: "2026-07-29T03:42:05.112Z"
-last_activity: 2026-07-28
+stopped_at: Completed 01-10-PLAN.md（gap 1 engine+前端两半均已关闭）
+last_updated: "2026-07-29T04:00:21.051Z"
+last_activity: 2026-07-29
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 13
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 9 of 9
+Plan: 2 of 13
 Status: Ready to execute
-Last activity: 2026-07-28 — Phase 01 execution started
+Last activity: 2026-07-29 — Phase 01 execution started
 
-Progress: [██████████] 100%
+Progress: [████████░░] 77%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [██████████] 100%
 | Phase 01 P07 | 31min | 2 tasks | 9 files |
 | Phase 01 P08 | 11min | 2 tasks | 9 files |
 | Phase 01 P09 | 81min | 3 tasks | 19 files |
+| Phase 01 P10 | 10min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,11 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-09: Tauri v2 的 ACL 只管插件命令——generate_handler! 注册的自有命令不过 ACL。capabilities/ 缺失时 listen() 被拒而 invoke 全部正常，表现为「点了没反应且零报错」；任何新的 @tauri-apps/api 用法都需补一行 capability，且新调用点必须自己呈现 rejection
 - [Phase ?]: 01-09: 可达性是独立于路由正确性的性质——「hash 是 X 时渲染谁」全绿不代表用户到得了 X（Tauri 窗口没有地址栏）。dev-only UI 用 import.meta.env.DEV 门控并配一条生产构建断言（grep dist 产物）
 - [Phase ?]: 01-09: 勾选 INFRA-01（成功标准 2 的真实 WebView 两条通路由人工验证兑现）；INFRA-03 不勾——prism-llm 只有 secrets.rs，无 chat client，「支持 Anthropic/OpenAI 兼容端点」到 Phase 4
+- [Phase ?]: 01-10: 凭据守卫扩在 validate_base_url 内部而非新加调用点——set_setting 一行未动，「机制而非约定」的设计陈述完整保住（T-01-43：绕过界面直接 invoke 不改变结果）
+- [Phase ?]: 01-10: 密钥容器的边界必须建在**值**上而不只是键名上——is_secret_like_key 防的是键名，而 llm.base_url 这个键名完全正常，凭据藏在值里；userinfo 与 ?api-key= 是同一个洞的两个面
+- [Phase ?]: 01-10: 拒绝面扩张时不加 StoreError 变体（复用 InvalidUrl）——加变体会连带要求 commands.rs::map_err 与前端 ERROR_COPY 同步扩表，那是 IPC 短码契约的变更；「是凭据还是 scheme」的区分只在前端本地校验层做得到
+- [Phase ?]: 01-10: 前端体验层校验返回错误码而非布尔（localUrlIssue 取代 looksLikeHttpUrl）；判定面与 engine 逐项对齐（scheme/userinfo/query/fragment），避免「前端放行、engine 拒绝」在正常输入上出现
+- [Phase ?]: 01-10: 计划里的两条断言实测不成立须就地修正——单字符用户名 u 让「错误串不含用户名」恒假；type=text 的端点输入框必须回显用户输入，document.body.innerHTML 级的不回显断言在任何正确实现下都红。不回显的守法面是**错误文案**，不是整个 DOM
 
 ### Pending Todos
 
@@ -127,6 +133,7 @@ None yet.
 - ~~[01-09 / Phase 2+]: 若将来给项目加 capabilities/ 目录，has_app_acl_manifest 变 true，即使本地来源也会走 ACL —— src-tauri/tests/ipc.rs 届时需加一份测试用 capability，否则集体变红~~ — 实测不成立 (01-09)：capability 已加入，`cargo test -p prismdocs-shell --features test --test ipc` 仍 2 passed。被测的十个命令都是 `generate_handler!` 注册的自有命令、不受 ACL 管辖；ACL 生效影响的是**插件**命令，ipc 测试里一个都没有。若 Phase 6 给 ipc 测试加插件命令用例，那时才需要测试用 capability
 - [Phase 2+ 每次新增前端 Tauri API 用法]: 任何新的 `@tauri-apps/api` import（fs/dialog/window/webview/http…）都必须在 `src-tauri/capabilities/default.json` 补一行权限，**其缺席表现为静默无操作而非报错**（ACL 只管插件命令，自有命令不过 ACL）；且新调用点必须自己接住并呈现 rejection，否则连「是不是 capability 缺了」都无从判断。`capabilities.test.ts` 挡得住「顺手加个 fs:default」的过宽修复，挡不住忘记加
 - [Phase 2+ 每次写前端交互测试]: 单测会替被测系统假设掉前置条件——jsdom 替用户完成「输入 hash」（01-09 缺陷 1：冒烟页在真实窗口不可达而路由断言全绿）、mock 替运行时完成「ACL 放行」（01-09 缺陷 2）。两者的症状都是「什么都没发生，也没有报错」。这是 01-06 / 01-08 那族问题的第三、第四个变种，共同解药只有「把被测性质放进一个没有替身的链路里跑一次」
+- [01-11 完成前] INFRA-03 仍不勾：01-10 只关闭了写入侧（凭据型 base_url 不入库），静态扫描能否看见明文密钥由 01-11 关闭；且需求文本的「支持 Anthropic/OpenAI 兼容端点」半句要到 Phase 4 才有 chat client（沿用 01-09 的同一判据）
 
 ## Deferred Items
 
@@ -138,6 +145,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T02:21:33.538Z
-Stopped at: Completed 01-09-PLAN.md（phase 01 全部 9 个 plan 执行完毕，待 verify）
+Last session: 2026-07-29T03:59:34.615Z
+Stopped at: Completed 01-10-PLAN.md（gap 1 engine+前端两半均已关闭）
 Resume file: None
