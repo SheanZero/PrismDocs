@@ -247,6 +247,31 @@ mod tests {
         drop(squatter);
     }
 
+    /// 准入判定必须**按位**读版本串：丢掉一个不可解析的分量会把后面每一位左移一格，
+    /// 于是 `3.x.51` 塌缩成 `(3, 51, 0)` —— 一个碰巧够新的元组。失败形态是「比较结果错误」
+    /// 而不是报错，所以这条得直接喂畸形串，真实 SQLite 永远给不出它们。
+    #[test]
+    fn version_admission_rejects_malformed_strings() {
+        let admits =
+            |v: &str| matches!(super::parse_sqlite_version(v), Some(got) if got >= super::MIN_SQLITE);
+        let cases = [
+            ("3.53.2", true),   // 高于下界
+            ("3.51.3", true),   // 恰好等于下界
+            ("3.51.2", false),  // 低于下界
+            ("3.x.51", false),  // 畸形：不得被重排成 (3, 51, 0) 从而通过
+            ("3.51", false),    // 少一个分量
+            ("", false),        // 空串
+        ];
+        for (input, expected) in cases {
+            assert_eq!(
+                admits(input),
+                expected,
+                "version {input:?} should {} admission",
+                if expected { "pass" } else { "fail" }
+            );
+        }
+    }
+
     /// 第 4 步（迁移）必须排在第 5 步（建池）之前。
     ///
     /// 这条断言看的是源码顺序，不是行为——因为**行为测不出来**：实测把建池挪到迁移之前，
