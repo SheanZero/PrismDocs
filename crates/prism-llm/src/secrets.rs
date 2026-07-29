@@ -191,6 +191,32 @@ mod tests {
         let _ = keyring_core::unset_default_store();
     }
 
+    /// 从供应商控制台复制来的密钥常带一个尾随换行或空格。前端已在提交前裁剪，
+    /// 这里是**第二道**：绕过界面直接 invoke 走的也是这个函数，而一个带空白的凭据
+    /// 会让 `api_key_status()` 报「已配置」、让 Phase 4 的每次调用返回 401，
+    /// 本地没有任何信号指向空白。
+    #[test]
+    #[serial]
+    fn set_api_key_trims_surrounding_whitespace() {
+        install_mock_store();
+
+        set_api_key(&format!("  {FIXTURE_SECRET}\n")).expect("write a padded key");
+        assert_eq!(
+            get_api_key().expect("read back").as_deref(),
+            Some(FIXTURE_SECRET),
+            "存进钥匙串的密钥仍带首尾空白"
+        );
+
+        // 阴性对照：裁剪只碰首尾。一个「把所有空白都删掉」的实现会让上一条也绿，
+        // 而那会悄悄改坏一个内部含空格的合法凭据。
+        let inner = "prism-test value";
+        set_api_key(inner).expect("write a key with an inner space");
+        assert_eq!(get_api_key().expect("read back").as_deref(), Some(inner));
+
+        delete_api_key().expect("clean up");
+        let _ = keyring_core::unset_default_store();
+    }
+
     #[test]
     fn apikey_debug_is_redacted() {
         let key = ApiKey::new(FIXTURE_SECRET);

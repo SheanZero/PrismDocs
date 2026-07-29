@@ -85,6 +85,20 @@ describe("SettingsPage / API key", () => {
     expect(document.body.innerHTML).not.toContain(FAKE_KEY);
   });
 
+  // 从供应商控制台复制密钥的正常结果就是带一个尾随换行或空格。判空用 `trim()`
+  // 却把**原值**交出去，钥匙串里就躺着一个带空白的凭据：`api_key_status()` 报「已配置」，
+  // 而 Phase 4 的每次调用返回 401，本地没有任何信号指向空白（与 01-16 的 `McpDeps::new` 同源）。
+  it("trims surrounding whitespace off the key before it reaches the keychain", async () => {
+    renderPage();
+
+    const input = (await screen.findByLabelText(/API key/)) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: `  ${FAKE_KEY}\n` } });
+    fireEvent.click(screen.getByRole("button", { name: /保存密钥/ }));
+
+    // 逐字相等，不是 `toContain`：后者对一个原样透传的实现同样会绿。
+    await waitFor(() => expect(setApiKey).toHaveBeenCalledWith(FAKE_KEY));
+  });
+
   it("translates a keychain failure into Chinese copy instead of the raw code", async () => {
     setApiKey.mockRejectedValue("secret_error");
     renderPage();
@@ -159,6 +173,56 @@ describe("SettingsPage / base_url", () => {
       expect(setBaseUrl).toHaveBeenCalledWith("https://api.example.com/v1"),
     );
     expect(setBaseUrl).toHaveBeenCalledTimes(1);
+  });
+
+  // 前端的端点判定面必须与 engine 侧 `validate_base_url` 逐项对齐。**两个方向**的分歧
+  // 都要防：「前端放过、engine 拒绝」只是多一次 IPC 往返，而「前端拒绝、engine 会接受」
+  // 会告诉用户一句自相矛盾的话——他输入 `HTTPS://…` 却被告知「链接必须以 https:// 开头」。
+  //
+  // `localUrlIssue` 是模块内私有函数，这里走 UI 行为（输入 → 保存 → 断言是否发出 IPC
+  // 及其文案），那也更贴近真实路径。
+  const URL_CASES: ReadonlyArray<{
+    input: string;
+    verdict: "accepted" | "invalid_url" | "invalid_url_credentials";
+  }> = [
+    { input: "https://api.example.com/v1", verdict: "accepted" },
+    // scheme 大小写不敏感；engine 侧 `url` crate 会小写化后再比对 scheme。
+    { input: "HTTPS://api.example.com/v1", verdict: "accepted" },
+    { input: "HTTP://localhost:8080", verdict: "accepted" },
+    { input: "ftp://api.example.com", verdict: "invalid_url" },
+    { input: "not a url", verdict: "invalid_url" },
+    { input: "https://", verdict: "invalid_url" },
+    { input: "https://prism-test-user:prism-test-value@api.vendor.com/v1", verdict: "invalid_url_credentials" },
+    // 只有用户名没有密码：`password` 在这里是空串，只看密码的守卫会漏掉它。
+    { input: "https://prism-test-user@api.vendor.com/v1", verdict: "invalid_url_credentials" },
+    { input: "https://api.vendor.com/v1?deployment=prism-test-value", verdict: "invalid_url_credentials" },
+    { input: "https://api.vendor.com/v1#prism-test-value", verdict: "invalid_url_credentials" },
+  ];
+
+  it.each(URL_CASES)("judges $input as $verdict, matching the engine", async ({ input, verdict }) => {
+    renderPage();
+
+    const field = (await screen.findByLabelText(/LLM 端点/)) as HTMLInputElement;
+    fireEvent.change(field, { target: { value: input } });
+    fireEvent.click(screen.getByRole("button", { name: /保存端点/ }));
+
+    if (verdict === "accepted") {
+      await waitFor(() => expect(setBaseUrl).toHaveBeenCalledWith(input.trim()));
+      expect(screen.queryByRole("alert")).toBeNull();
+      return;
+    }
+
+    const alert = await screen.findByRole("alert");
+    // 两条文案的判别词互不重叠——只断言「有 alert」的话，一个把所有拒绝都
+    // 说成同一句的实现也会绿，而那正是 engine 侧特意分开两类的理由。
+    if (verdict === "invalid_url") {
+      expect(alert.textContent ?? "").toMatch(/并带有主机名/);
+      expect(alert.textContent ?? "").not.toMatch(/用户名或密码/);
+    } else {
+      expect(alert.textContent ?? "").toMatch(/用户名或密码/);
+    }
+    // engine 侧的守卫不该是用户第一次听说这件事的地方。
+    expect(setBaseUrl).not.toHaveBeenCalled();
   });
 
   // D-16a / D-06：LLM 配置可跳过。页面在**没有任何密钥**时仍要完整渲染，
