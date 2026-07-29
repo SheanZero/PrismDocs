@@ -98,6 +98,15 @@ mod tests {
     use super::{insert_samples, SAMPLE_DOCS, SAMPLE_PROJECT_ID};
     use crate::search::search;
 
+    fn count_samples(conn: &Connection) -> i64 {
+        conn.query_row(
+            "SELECT count(*) FROM documents WHERE project_id = ?1",
+            [SAMPLE_PROJECT_ID],
+            |r| r.get(0),
+        )
+        .expect("count documents")
+    }
+
     fn seeded() -> Connection {
         let mut conn = Connection::open_in_memory().expect("in-memory db");
         crate::migrations::migrations()
@@ -123,6 +132,53 @@ mod tests {
         let conn = seeded();
         let hits = search(&conn, SAMPLE_PROJECT_ID, "量子纠缠").expect("search");
         assert!(hits.is_empty(), "库里没有的词不应命中，实得 {hits:?}");
+    }
+
+    /// `insert_samples` 的返回值必须来自执行结果，而不是一个与执行无关的常量。
+    ///
+    /// 断言把返回值与**库里的实际计数**对上，而不是与 `SAMPLE_DOCS.len()` 对上——
+    /// 后者是拿常量比常量，函数写没写进去都成立。
+    ///
+    /// **判别力说明（实测，见 01-19-SUMMARY 反证 C）**：顺境下常量与实际计数恰好相等，
+    /// 这条断言对两种实现都是绿的。它的判别点是「返回值与库状态发生分歧」的那一刻——
+    /// 把循环里某一条文档跳过（不动返回逻辑）时，常量实现报 3 而库里只有 2，这条立刻红；
+    /// 累加实现报 2，与库状态一致，保持绿。这正是一个「能报告失败」的返回值与一个
+    /// 「报告不了它被要求报告的失败」的返回值的区别（上轮 IN-02）。
+    #[test]
+    fn the_returned_count_matches_the_rows_actually_in_the_database() {
+        let mut conn = Connection::open_in_memory().expect("in-memory db");
+        crate::migrations::migrations()
+            .to_latest(&mut conn)
+            .expect("to_latest");
+
+        let tx = conn.transaction().expect("tx");
+        let first = insert_samples(&tx).expect("first seed");
+        tx.commit().expect("commit");
+        assert_eq!(
+            first as i64,
+            count_samples(&conn),
+            "首次播种的返回值应等于库里实际存在的样例文档数"
+        );
+
+        // 重复播种：`ON CONFLICT DO UPDATE` 每行仍算一次受影响行，
+        // 返回值因此继续与库状态一致（而不是悄悄归零或翻倍）。
+        let tx = conn.transaction().expect("tx");
+        let second = insert_samples(&tx).expect("second seed");
+        tx.commit().expect("commit");
+        assert_eq!(
+            second as i64,
+            count_samples(&conn),
+            "重复播种的返回值应反映本次实际生效的行数"
+        );
+    }
+
+    /// 任一 `execute` 失败必须传播成 `Err`，而不是照常返回一个条数。
+    #[test]
+    fn a_failed_statement_propagates_instead_of_reporting_a_count() {
+        // 没跑迁移：`projects` / `documents` 都不存在。
+        let mut conn = Connection::open_in_memory().expect("in-memory db");
+        let tx = conn.transaction().expect("tx");
+        insert_samples(&tx).expect_err("missing tables must surface as Err");
     }
 
     /// 冒烟页会被反复点击，重复播种不得堆出重复文档。
