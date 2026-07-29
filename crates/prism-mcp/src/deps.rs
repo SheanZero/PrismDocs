@@ -18,6 +18,8 @@ use std::sync::Arc;
 
 use prism_types::{CommentSink, FeedbackSource};
 
+use crate::McpError;
+
 /// MCP handler 可用的全部能力面 + 本次安装的 bearer token。
 #[derive(Clone)]
 pub struct McpDeps {
@@ -27,16 +29,34 @@ pub struct McpDeps {
 }
 
 impl McpDeps {
+    /// **可失败构造**：空 / 纯空白的 bearer 在这里就被拒（CR-03 纵深第一层）。
+    ///
+    /// 本 crate 既不生成也不存储 token（见文件头 10-15 行），它唯一能做的就是拒绝一个
+    /// 装不出门禁的输入。这个检查刻意放在构造期而不是比较层：放在比较层意味着
+    /// 「每次比较都要记得」，放在这里它是「造不出来」——`McpDeps` 一旦存在，
+    /// 其 bearer 就保证非空。
+    ///
+    /// Phase 6 由 `prism-engine` 从钥匙串读出 token 后注入，届时
+    /// 「读到空串」「首启时 token 尚未写入」「调用点一个 `unwrap_or_default()`」
+    /// 三条现实路径都会精确命中这里。按 D-06（无 key 时应用照常启动），
+    /// 那一侧应把 `Err` 降级为「MCP 服务不启动 + 一条 warn」，**不要** `unwrap()`。
+    ///
+    /// 纵深的第二层在 `middleware::constant_time_eq`：即便有人绕过本构造器造出空配置，
+    /// 比较层也拒。两层各有自己的测试，互不代替。
     pub fn new(
         feedback: Arc<dyn FeedbackSource>,
         comments: Arc<dyn CommentSink>,
         bearer: impl Into<Arc<str>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, McpError> {
+        let bearer = bearer.into();
+        if bearer.trim().is_empty() {
+            return Err(McpError::EmptyBearer);
+        }
+        Ok(Self {
             feedback,
             comments,
-            bearer: bearer.into(),
-        }
+            bearer,
+        })
     }
 
     /// token 原文的唯一取用口。
@@ -82,6 +102,7 @@ mod tests {
 
     fn deps(bearer: &str) -> McpDeps {
         McpDeps::new(Arc::new(Empty), Arc::new(Empty), bearer)
+            .expect("this helper is only called with a non-empty test bearer")
     }
 
     #[test]

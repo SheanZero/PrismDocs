@@ -19,6 +19,15 @@ pub mod server;
 pub enum McpError {
     #[error("failed to bind the loopback MCP listener: {0}")]
     Bind(#[from] std::io::Error),
+
+    /// 注入的 bearer token 是空串或纯空白——一个装不出门禁的输入（CR-03）。
+    ///
+    /// **文案零插值是硬要求**：这里不得出现 `{0}` / `{bearer}` 之类的占位符。
+    /// Phase 1 命中这个变体的值恰好是空白串，但 Phase 6 由 `prism-engine` 从钥匙串
+    /// 注入时，被拒的值可能是一个真 token 的畸形前缀。错误只陈述规则，不回显值——
+    /// 与 `McpDeps` 手写 `Debug` 的 `<redacted>` 同一口径（T-01-29 / T-01-53）。
+    #[error("the injected bearer token must not be empty")]
+    EmptyBearer,
 }
 
 /// 本 SDK 版本声明的最新 MCP 协议版本。

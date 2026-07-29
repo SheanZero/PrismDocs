@@ -46,6 +46,7 @@ fn deps_returning(items: Vec<FeedbackItem>) -> McpDeps {
         Arc::new(NoopSink),
         TEST_BEARER,
     )
+    .expect("TEST_BEARER is a non-empty 32-byte hex constant")
 }
 
 fn marker_item() -> FeedbackItem {

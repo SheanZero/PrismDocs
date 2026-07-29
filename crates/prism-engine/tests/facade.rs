@@ -370,7 +370,10 @@ async fn engine_satisfies_service_traits() {
     let comments: Arc<dyn CommentSink> = Arc::clone(&engine) as Arc<dyn CommentSink>;
 
     let ct = CancellationToken::new();
-    let (addr, _task) = serve_loopback(McpDeps::new(feedback, comments, TEST_BEARER), ct.clone())
+    // Phase 6 的真实注入路径建在这个形状上：token 从钥匙串读出后注入，构造可失败。
+    let deps = McpDeps::new(feedback, comments, TEST_BEARER)
+        .expect("TEST_BEARER is a non-empty 32-byte hex constant");
+    let (addr, _task) = serve_loopback(deps, ct.clone())
         .await
         .expect("loopback MCP server started");
 

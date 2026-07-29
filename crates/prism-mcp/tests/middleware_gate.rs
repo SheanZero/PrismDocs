@@ -57,6 +57,7 @@ impl CommentSink for EmptySource {
 
 fn deps() -> McpDeps {
     McpDeps::new(Arc::new(EmptySource), Arc::new(EmptySource), GOOD_BEARER)
+        .expect("GOOD_BEARER is a non-empty 32-byte hex constant")
 }
 
 // ---------------------------------------------------------------------------
