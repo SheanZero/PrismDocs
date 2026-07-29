@@ -159,6 +159,23 @@ describe("SettingsPage / base_url", () => {
     expect(await screen.findByText(/已保存/)).toBeTruthy();
   });
 
+  // WINDOWS #10 / 01-22 遗留：成功通知此前不在任何 live region 里，读屏对「已保存」
+  // 完全静默。冒烟页（01-22）已经是 error → alert / ok → status，这里补齐同一形状。
+  //
+  // 两条断言成对：只有前者时，一个把**所有**通知都改成 `alert` 的实现也会绿——
+  // 而那会让每次成功保存都打断读屏用户正在读的内容。
+  it("announces a successful save in a status region, not an alert region", async () => {
+    renderPage();
+
+    const field = (await screen.findByLabelText(/LLM 端点/)) as HTMLInputElement;
+    fireEvent.change(field, { target: { value: "https://api.example.com/v1" } });
+    fireEvent.click(screen.getByRole("button", { name: /保存端点/ }));
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent ?? "").toContain("已保存");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   // 凭据藏在**值**里：`llm.base_url` 这个键名再正常不过，而 `https://u:key@host/v1`
   // 里的那串东西会被原样提交。权威守卫在 engine 的 set_setting 写入路径上（01-10 Task 1），
   // 这一层只是让用户在按下保存之前就知道那串东西不该填在这里。

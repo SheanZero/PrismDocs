@@ -232,6 +232,12 @@ export default function SettingsPage() {
   );
 }
 
+/// 与 `DevSmoke.tsx` 的同名组件同源（01-22）：两个页面各写一份是本 phase 刻意接受的
+/// 重复，D-06 禁的是投机建共享布局层。
+///
+/// 两个 tone 落在**不同的 live region** 上：error → `alert`（打断读屏，用户必须知道），
+/// ok → `status`（等读屏读完当前内容再播报）。颜色不是可访问的通道——只靠 `#00701a`
+/// 的话，读屏用户对「已保存」一无所知。
 function NoticeLine({ notice }: { notice: Notice }) {
   if (!notice) return null;
   if (notice.tone === "error") {
@@ -241,7 +247,11 @@ function NoticeLine({ notice }: { notice: Notice }) {
       </p>
     );
   }
-  return <p style={{ color: "#00701a" }}>{notice.text}</p>;
+  return (
+    <p role="status" style={{ color: "#00701a" }}>
+      {notice.text}
+    </p>
+  );
 }
 
 const page = {
