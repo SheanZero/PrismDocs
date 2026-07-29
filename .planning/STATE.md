@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-23-PLAN.md
-last_updated: "2026-07-29T13:23:05.333Z"
+stopped_at: Completed 01-24-PLAN.md
+last_updated: "2026-07-29T13:32:20.485Z"
 last_activity: 2026-07-29
 last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 21 of 28（01-01..01-16 已执行；下一份 01-17）
+Plan: 22 of 28（01-01..01-16 已执行；下一份 01-17）
 Status: Ready to execute
 Last activity: 2026-07-29 — 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 
-Progress: [████████░░] 75%
+Progress: [████████░░] 79%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -87,6 +87,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P21 | ~40min | 3 tasks | 3 files |
 | Phase 01 P22 | ~25min | 2 tasks | 4 files |
 | Phase 01 P23 | 9min | 3 tasks | 5 files |
+| Phase 01 P24 | ~25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -179,6 +180,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-23: errorCopy 的查找表建在 Object.create(null) 之上（机制），而不是靠每个查找点写 Object.hasOwn（约定）
 - [Phase ?]: 01-23: 前端 URL 判定一律先解析后看结构，不做字节级前缀比较；与 engine validate_base_url 的一致性用临时跨语言对照测试取证（跑完即删）
 - [Phase ?]: 01-23: API key 在前端 submitKey 与 prism_llm::secrets::set_api_key 两端走同一份 trim（与 01-16 McpDeps::new 同源）
+- [Phase ?]: 01-24: 断言最小权限/最小面用精确相等而非 denylist 过滤——denylist 的强度恰好等于写它的人当时的想象力，实测 CSP 侧 5 条、capability 侧 2 条本该红的削弱形态在 denylist 下全绿
+- [Phase ?]: 01-24: 一条 not.toContain 在目标串本来就合法含该 token 时是不可满足的断言，改写成「含该 token 的项集合精确等于 [合法的那一项]」——可满足且强度更高
+- [Phase ?]: 01-24: CSP 白名单必须同时钉住指令名集合——script-src-elem 优先于 script-src 生效，只钉六条来源列表对它一条都不会红
 
 ### Pending Todos
 
@@ -213,6 +217,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T13:23:05.324Z
-Stopped at: Completed 01-23-PLAN.md
+Last session: 2026-07-29T13:32:20.476Z
+Stopped at: Completed 01-24-PLAN.md
 Resume file: None

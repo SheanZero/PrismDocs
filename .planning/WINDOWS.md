@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 9
+open_count: 10
 waived_count: 0
 fixed_count: 1
-total_count: 10
-last_updated: 2026-07-29T13:22:54.127Z
+total_count: 11
+last_updated: 2026-07-29T13:32:35.552Z
 ---
 
 # Broken Windows Ledger
@@ -25,6 +25,7 @@ last_updated: 2026-07-29T13:22:54.127Z
 | 8 | 01 | unrun-verify | src-tauri/tauri.conf.json |  | 01-13 Task 1 的 <human-check> 五步（真实 WebView + dmg 两形态的 CSP 验证）未执行，顺延至 end-of-phase 人工验证 | open |  | 2026-07-29T05:34:36.523Z |  |
 | 9 | 01 | unrun-verify | src-tauri/src/lib.rs |  | 01-13 Task 3 的行为断言未执行：tauri dev 终端是否真的打出 settings.rs 的明文 http 告警（sink 非空的端到端证据） | open |  | 2026-07-29T05:34:36.571Z |  |
 | 10 | 01 | deviation | src/pages/Settings.tsx |  | Settings.tsx 的成功通知不在任何 live region 里（NoticeLine 的 ok 分支只有颜色无 role），读屏对「已保存」完全静默——同一条 IN-06 推理，本 plan 范围外未动 | fixed |  | 2026-07-29T13:10:05.615Z | 2026-07-29T13:22:54.127Z |
+| 11 | 01 | deviation | src-tauri/tauri.conf.json |  | 发布 csp 的 style-src 仍带 'unsafe-inline'（React 内联 style 属性），使 01-24 plan 要求的「csp 整串不含 unsafe-inline」不可满足；已改写为「含该 token 的指令集合精确等于 [style-src ...]」，但这条发布形态的放宽本身未被消除 | open |  | 2026-07-29T13:32:35.552Z |  |
 
 ````json
 [
@@ -147,6 +148,18 @@ last_updated: 2026-07-29T13:22:54.127Z
     "reason": "",
     "recorded_at": "2026-07-29T13:10:05.615Z",
     "resolved_at": "2026-07-29T13:22:54.127Z"
+  },
+  {
+    "id": 11,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "src-tauri/tauri.conf.json",
+    "line": null,
+    "description": "发布 csp 的 style-src 仍带 'unsafe-inline'（React 内联 style 属性），使 01-24 plan 要求的「csp 整串不含 unsafe-inline」不可满足；已改写为「含该 token 的指令集合精确等于 [style-src ...]」，但这条发布形态的放宽本身未被消除",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T13:32:35.552Z",
+    "resolved_at": null
   }
 ]
 ````
