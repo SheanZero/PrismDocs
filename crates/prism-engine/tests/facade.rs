@@ -18,15 +18,20 @@
 //! 包上 timeout 之后，「事件没送出去」会精确地落在下面那条具名的 `expect` 上。
 
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use prism_engine::{Engine, EngineError, EventBus};
+use prism_mcp::deps::McpDeps;
+use prism_mcp::server::{serve_loopback, MCP_MOUNT_PATH};
 use prism_store::settings::SETTING_BASE_URL;
 use prism_store::Store;
-use prism_types::EngineEvent;
+use prism_types::{CommentSink, EngineEvent, FeedbackSource};
+use serde_json::json;
 use serial_test::serial;
 use tokio::sync::broadcast::Receiver;
+use tokio_util::sync::CancellationToken;
 
 /// 等一条事件的上限。本地进程内广播的实际延迟在微秒级；两秒纯粹是给
 /// 「根本没送出去」一个确定的落点。
@@ -240,4 +245,149 @@ fn base_url_goes_to_settings_not_keychain() {
     );
 
     let _ = keyring_core::unset_default_store();
+}
+
+// ---------------------------------------------------------------- D-09 注入面
+
+/// 32 字节 hex——形状与 Phase 6 的 CSPRNG token 一致，值本身是测试常量。
+const TEST_BEARER: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+/// 三层门禁全合法的最小请求头组合（01-06 交接说明给出）。
+async fn post(
+    client: &reqwest::Client,
+    addr: &SocketAddr,
+    session: Option<&str>,
+    body: serde_json::Value,
+) -> reqwest::Response {
+    let mut req = client
+        .post(format!("http://{addr}{MCP_MOUNT_PATH}"))
+        .header(reqwest::header::ACCEPT, "application/json, text/event-stream")
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .header(reqwest::header::ORIGIN, "http://127.0.0.1")
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {TEST_BEARER}"),
+        )
+        .body(body.to_string());
+    if let Some(session) = session {
+        req = req.header("mcp-session-id", session);
+    }
+    req.send().await.expect("request reached the server")
+}
+
+/// 走完整 MCP 握手，然后用给定的 projectId 调一次 `list_feedback`，返回响应原文。
+async fn call_list_feedback(addr: &SocketAddr, project_id: &str) -> String {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .expect("build test client");
+
+    let init = post(
+        &client,
+        addr,
+        None,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": prism_mcp::protocol_version(),
+                "capabilities": {},
+                "clientInfo": { "name": "prism-engine-injection-test", "version": "0.0.0" }
+            }
+        }),
+    )
+    .await;
+    assert!(
+        init.status().is_success(),
+        "initialize 失败: {}",
+        init.status()
+    );
+    let session = init
+        .headers()
+        .get("mcp-session-id")
+        .expect("server issued a session id")
+        .to_str()
+        .expect("session id is ascii")
+        .to_string();
+    let _ = init.text().await;
+
+    let ack = post(
+        &client,
+        addr,
+        Some(&session),
+        json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }),
+    )
+    .await;
+    assert!(ack.status().is_success(), "initialized 失败: {}", ack.status());
+    let _ = ack.text().await;
+
+    let call = post(
+        &client,
+        addr,
+        Some(&session),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "list_feedback",
+                "arguments": { "projectId": project_id }
+            }
+        }),
+    )
+    .await;
+    assert!(
+        call.status().is_success(),
+        "tools/call 失败: {}",
+        call.status()
+    );
+    call.text().await.expect("tool response body")
+}
+
+/// D-09 的**运行期**证据，用的是**真实 Engine** 而不是假实现。
+///
+/// 编译期证据（prism-mcp 的依赖树里没有 prism-engine）由 `check-deps.sh no-cycle` 承担；
+/// 01-06 用假实现证明了"注入通路通"。本测试补的是最后一段：装进 `Arc<dyn …>` 的
+/// 那个具体类型换成真的 `Engine` 之后，链路依然成立。
+///
+/// ## 这条测试的判别性从哪来
+///
+/// Phase 1 的 `list_feedback` 对合法 project 返回空 vec（comments 表属于 Phase 5），
+/// 而**空结果与"handler 根本没调注入的 trait"是不可区分的**——断言"响应里有 []"
+/// 对一个完全忽略注入的实现同样成立。
+///
+/// 所以判别性落在第二次调用上：空 project_id 时 `Engine` 会返回它**自己写的**
+/// `ServiceError::Invalid`，那段文本只可能来自 engine 侧的实现。返回 `Ok(vec![])`
+/// 的假实现、或不调 trait 的 handler，都产生不出它。
+#[tokio::test]
+async fn engine_satisfies_service_traits() {
+    let (_dir, store) = store_on_temp_db();
+    let engine = Arc::new(Engine::new(store));
+
+    // D-09 的注入面：具体类型在这一行被擦掉，prism-mcp 之后只认 trait。
+    let feedback: Arc<dyn FeedbackSource> = Arc::clone(&engine) as Arc<dyn FeedbackSource>;
+    let comments: Arc<dyn CommentSink> = Arc::clone(&engine) as Arc<dyn CommentSink>;
+
+    let ct = CancellationToken::new();
+    let (addr, _task) = serve_loopback(McpDeps::new(feedback, comments, TEST_BEARER), ct.clone())
+        .await
+        .expect("loopback MCP server started");
+
+    // ① 合法 project：链路通到底，返回 engine 的空结果（Phase 1 的正常状态）。
+    let ok_body = call_list_feedback(&addr, "proj-1").await;
+    assert!(
+        ok_body.contains("[]"),
+        "合法 project 应返回空反馈列表（Ok 而非 Err），实得: {ok_body}"
+    );
+
+    // ② 空 project：响应里出现 **engine 自己写的**校验文本。
+    //    这是本测试唯一的判别性断言——见上面的文档注释。
+    let err_body = call_list_feedback(&addr, "").await;
+    ct.cancel();
+
+    assert!(
+        err_body.contains("project id must not be empty"),
+        "响应里没有出现 Engine 自己的校验文本 —— 注入的具体类型不是真的被调用: {err_body}"
+    );
 }
