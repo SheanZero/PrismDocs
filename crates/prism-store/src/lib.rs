@@ -36,8 +36,18 @@ pub fn default_db_path() -> Result<PathBuf, StoreError> {
 mod tests {
     use super::*;
 
-    fn parts(v: &str) -> Vec<u32> {
-        v.split('.').filter_map(|s| s.parse().ok()).collect()
+    /// `major.minor.patch` **按位**解析——与 `open.rs::parse_sqlite_version` 同源。
+    ///
+    /// 那一份在 `open()` 的准入判定路径上且是 `open` 模块私有的（本模块访问不到，
+    /// 因此这里是副本而不是复用）；这一份只服务测试。两处都必须按位解析：
+    /// `filter_map(|s| s.parse().ok())` 会丢掉不可解析的分量并把后面每一位左移一格，
+    /// 于是 `3.x.53` 塌缩成 `(3, 53, 0)` —— 一个碰巧够新的元组（上轮 IN-03）。
+    fn version_tuple(v: &str) -> Option<(u32, u32, u32)> {
+        let mut parts = v.split('.').map(str::parse::<u32>);
+        match (parts.next(), parts.next(), parts.next()) {
+            (Some(Ok(major)), Some(Ok(minor)), Some(Ok(patch))) => Some((major, minor, patch)),
+            _ => None,
+        }
     }
 
     #[test]
@@ -49,14 +59,28 @@ mod tests {
         drop(store);
     }
 
+    /// 成功标准 3 的「bundled SQLite ≥3.51.3」在**运行期**的落点。
+    ///
+    /// 两条断言守两条不同的性质：形态（三段点分数字）与下界（≥ [`MIN_SQLITE`]）。
+    /// 下界必须比到 patch 位——只判 `p[0] == 3` 时，pin 回退到 3.50.x 不会有任何东西变红
+    /// （`01-VERIFICATION.md` 的第三条 warning）。期望值取自 `MIN_SQLITE` 而不是字面量：
+    /// 这个数字在仓库里只有 `open.rs` 那一个来源，改 pin 时两条测试自动跟上。
     #[test]
-    fn sqlite_version_returns_three_dotted_numbers() {
+    fn sqlite_version_meets_the_pinned_minimum() {
         let dir = tempfile::TempDir::new().expect("tempdir");
         let store = Store::open(&dir.path().join("prismdocs.db")).expect("open store");
         let version = store.sqlite_version().expect("version query");
-        let p = parts(&version);
-        assert_eq!(p.len(), 3, "unexpected sqlite version string: {version}");
-        assert_eq!(p[0], 3, "expected SQLite 3.x, got {version}");
+        assert_eq!(
+            version.split('.').count(),
+            3,
+            "unexpected sqlite version string: {version}"
+        );
+        let got = version_tuple(&version)
+            .unwrap_or_else(|| panic!("unparsable sqlite version: {version}"));
+        assert!(
+            got >= MIN_SQLITE,
+            "bundled SQLite {version} is older than the pinned minimum {MIN_SQLITE:?}"
+        );
     }
 
     #[test]

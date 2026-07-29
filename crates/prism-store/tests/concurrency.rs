@@ -8,15 +8,20 @@
 
 use std::sync::{mpsc, Arc, Barrier};
 
-use prism_store::READ_POOL_MAX_SIZE;
+use prism_store::{MIN_SQLITE, READ_POOL_MAX_SIZE};
 
-fn version_tuple(v: &str) -> (u32, u32, u32) {
-    let p: Vec<u32> = v.split('.').filter_map(|s| s.parse().ok()).collect();
-    (
-        p.first().copied().unwrap_or(0),
-        p.get(1).copied().unwrap_or(0),
-        p.get(2).copied().unwrap_or(0),
-    )
+/// `major.minor.patch` **按位**解析——与 `open.rs::parse_sqlite_version` 同源。
+///
+/// 那一份在 `open()` 的准入判定路径上且是 crate 私有的（集成测试访问不到，因此这里是
+/// 副本而不是复用）。两处都必须按位解析：`filter_map(|s| s.parse().ok())` 会丢掉不可解析的
+/// 分量并把后面每一位左移一格，于是 `3.x.53` 塌缩成 `(3, 53, 0)` —— 一个碰巧够新的元组
+/// （上轮 IN-03）。
+fn version_tuple(v: &str) -> Option<(u32, u32, u32)> {
+    let mut parts = v.split('.').map(str::parse::<u32>);
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(Ok(major)), Some(Ok(minor)), Some(Ok(patch))) => Some((major, minor, patch)),
+        _ => None,
+    }
 }
 
 const INSERT_PROJECT: &str =
@@ -148,6 +153,9 @@ fn every_pooled_connection_is_query_only() {
 }
 
 /// bundled SQLite 必须新到含 WAL-reset 修复。
+///
+/// 下界取自 [`MIN_SQLITE`] 而不是写死的字面量：数字在仓库里只能有一个来源，
+/// 否则改 pin 时两处各自漂移，而漂移的一处会继续绿。
 #[test]
 fn bundled_sqlite_meets_minimum() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -157,9 +165,10 @@ fn bundled_sqlite_meets_minimum() {
         .read(|c| Ok(c.query_row("SELECT sqlite_version()", [], |r| r.get(0))?))
         .expect("version query");
 
+    let got = version_tuple(&v).unwrap_or_else(|| panic!("unparsable sqlite version: {v}"));
     assert!(
-        version_tuple(&v) >= (3, 51, 3),
-        "bundled SQLite too old: {v}"
+        got >= MIN_SQLITE,
+        "bundled SQLite {v} is older than the pinned minimum {MIN_SQLITE:?}"
     );
 }
 
