@@ -47,7 +47,9 @@
     "security_enforcement": true,
     "security_asvs_level": 1,
     "security_block_on": "high",
-    "_auto_chain_active": false
+    "_auto_chain_active": false,
+    "build_command": "cargo build --workspace",
+    "test_command": "cargo test -p prism-types -p prism-store -p prism-fs -p prism-parse -p prism-anchor -p prism-llm -p prism-mcp -p prism-engine && cargo test -p prismdocs-shell --features test && npm run test -- --run"
   },
   "ship": {
     "pr_body_sections": [
