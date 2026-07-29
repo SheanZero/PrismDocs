@@ -2991,10 +2991,19 @@ dependencies = [
 name = "prism-engine"
 version = "0.1.0"
 dependencies = [
+ "keyring-core",
+ "prism-llm",
+ "prism-mcp",
  "prism-store",
  "prism-types",
+ "reqwest",
+ "serde_json",
+ "serial_test",
  "tempfile",
  "thiserror 2.0.19",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]

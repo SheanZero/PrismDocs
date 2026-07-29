@@ -5,10 +5,32 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+# 依赖方向（RESEARCH § Pattern 4）：prism-engine ──▶ prism-mcp ──▶ prism-types，
+# 且 prism-engine ──▶ prism-types。方向是单向的：facade 构造并托管 MCP server，
+# 而 prism-mcp 只认注入的 service trait，**永远不依赖本 crate**。
+#
+# **不得依赖 tauri**（D-01）——scripts/check-deps.sh 的 tauri-free 断言覆盖本 crate。
+#
+# prism-llm 是普通依赖：shell（src-tauri）只依赖 prism-engine，因此密钥入口
+# 只能经本 crate 转交。本 crate 自己**不声明** reqwest / keyring-core，
+# 也不 `use` 它们——网络与密钥的实际出口仍唯一地在 prism-llm 内
+# （scripts/check-deps.sh 的 facade-egress 断言把这条性质变成可执行检查）。
 [dependencies]
 prism-types = { workspace = true }
 prism-store = { workspace = true }
+prism-llm = { workspace = true }
+prism-mcp = { workspace = true }
+tokio = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
+# reqwest 只出现在 [dev-dependencies]：engine 侧的端到端注入测试要当一次 HTTP
+# **客户端**去打自己托管的 MCP server。普通边一旦出现它，NFR-03 的唯一出口就失守。
 [dev-dependencies]
 tempfile = { workspace = true }
+serial_test = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
+tokio-util = { workspace = true }
+keyring-core = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
