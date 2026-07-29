@@ -154,10 +154,27 @@ describe("DevSmokePage", () => {
     );
     renderPage();
 
-    const notice = await screen.findByRole("status");
+    // `alert` 而不是 `status`：`status` 是礼貌 live region，读屏不会为它打断。
+    // 「本页从此收不到任何事件」不是一次可重试的操作失败，它必须被播报出来。
+    // 同一条推理适用于上面那句「计数为 0 不足以作断言」——较弱的行为一旦写进
+    // 断言，它就成了被守住的行为。
+    const notice = await screen.findByRole("alert");
     expect(notice.textContent ?? "").toContain("事件通道");
     // Tauri 的原始 ACL 文本是内部细节，不得原样进 DOM（与命令错误码同一条规矩）。
     expect(notice.textContent ?? "").not.toContain("not allowed");
+  });
+
+  // 阴性对照。没有这条，一个「把所有通知都改成 alert」的实现也能让上面那条绿——
+  // 而那会让读屏对每一次成功都打断播报，等于把 alert 这个信号磨没。
+  // 这条断言的**判别力**由「NoticeLine 无条件 alert 则它变红」证明，不由它自己绿证明。
+  it("keeps a successful notice out of the alert region", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /插入样例文档/ }));
+
+    const notice = await screen.findByRole("status");
+    expect(notice.textContent ?? "").toContain("样例文档已写入");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("streams with total=1000 and reports the seq verdict", async () => {
