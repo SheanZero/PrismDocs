@@ -191,10 +191,19 @@ npm install -D vite@8 @vitejs/plugin-react @tauri-apps/cli@2 typescript vitest
 | axum | crates.io | 2021 | 7.9M/wk | tokio-rs/axum | OK | Approved |
 | tempfile | crates.io | 2015 | 12.2M/wk | Stebalien/tempfile | OK | Approved |
 | serial_test | crates.io | 2018 | 1.86M/wk | palfrey/serial_test | OK | Approved |
+| tracing-subscriber | crates.io | 首发 2019-06-27 | ~10M/wk（90 天 128M，累计 523M） | tokio-rs/tracing（与已在用的 `tracing` 同仓库） | OK | Approved — 人工确认于 01-13 执行期（2026-07-29） |
 | @tanstack/react-query | npm | 最新版 2026-07-21 | 61.4M/wk | TanStack/query | SUS（近期发版触发） | Approved — 见下 |
 | @tauri-apps/api | npm | 2026-06-17 | 2.1M/wk | tauri-apps/tauri | OK | Approved |
 | @tauri-apps/cli | npm | 2026-06-28 | 1.8M/wk | tauri-apps/tauri | SUS（近期发版触发） | Approved — 见下 |
 | @vitejs/plugin-react | npm | 2026-07-22 | 75.5M/wk | vitejs/vite-plugin-react | SUS（近期发版触发） | Approved — 见下 |
+
+**关于 `tracing-subscriber` 的补录说明:** 本表建于 phase 规划期，早于 gap-closure plan 01-13。
+01-13 Task 2 是一个 `gate="blocking-human"` 的包合法性闸门——未经审计的包一律按 `[ASSUMED]` 处理，
+不可自动放行。人工于 2026-07-29 在 crates.io 上逐项核对并回复 "approved"：名字逐字为
+`tracing-subscriber`（连字符、单数 `subscriber`，非 `tracing-subscribers` / `tracing_subscriber`
+等形近名）、仓库 `https://github.com/tokio-rs/tracing`（与本 workspace 已在用的 `tracing` 同仓库同
+owner）、首发 2019-06-27、累计 ~523M 次下载（90 天 ~128M）、最高稳定版 0.3.23（2026-03-13）、
+未被 yank、许可 MIT、`env-filter` feature 存在。本 plan pin `0.3` + features `["env-filter"]`。
 
 **Packages removed due to [SLOP] verdict:** none
 
