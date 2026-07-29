@@ -40,6 +40,8 @@ export const SETTING_BASE_URL = "llm.base_url";
 
 const ERROR_COPY: Record<string, string> = {
   invalid_url: "链接必须以 http:// 或 https:// 开头，并带有主机名。",
+  invalid_url_credentials:
+    "端点链接里不能带用户名或密码（形如 user:pass@host），也不能带查询串（?…）或锚点（#…）。密钥请填在上面的 API key 栏——它只进系统钥匙串，不入数据库。",
   invalid_setting: "这个配置项不被接受（疑似密钥的键名一律不入库）。",
   store_error: "写入本地数据库失败，请重试。",
   secret_error: "系统钥匙串当前不可用，密钥没有保存。",

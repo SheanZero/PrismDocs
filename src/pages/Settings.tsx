@@ -11,12 +11,29 @@ import {
   SETTING_BASE_URL,
 } from "../lib/ipc";
 
-/// 前端的轻量 scheme 提示。**这不是安全边界**——绕过界面直接 invoke 就没有它。
-/// 权威校验长在 engine 的 `set_setting` 写入路径上（01-05）。两边都要有：
+/// 前端的轻量端点提示。**这不是安全边界**——绕过界面直接 invoke 就没有它。
+/// 权威校验长在 engine 的 `set_setting` 写入路径上（01-05 / 01-10）。两边都要有：
 /// 这一层是体验（不必等一次 IPC 往返才知道写错了），那一层才是机制。
-function looksLikeHttpUrl(raw: string): boolean {
+///
+/// 这一层现在多认一种形态（链接里带凭据），是为了让用户**在按下保存之前**就知道
+/// 那串东西不该填在这里——不是因为它变成了防线。
+///
+/// 判定项与 engine 侧 `validate_base_url` 逐项对齐（scheme / userinfo / query / fragment），
+/// 这样「前端放过但 engine 拒绝」不会在正常输入上出现。返回 `null` 表示本地看不出问题。
+function localUrlIssue(raw: string): "invalid_url" | "invalid_url_credentials" | null {
   const trimmed = raw.trim();
-  return trimmed.startsWith("http://") || trimmed.startsWith("https://");
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+    return "invalid_url";
+  }
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return "invalid_url";
+  }
+  if (url.username !== "" || url.password !== "") return "invalid_url_credentials";
+  if (url.search !== "" || url.hash !== "") return "invalid_url_credentials";
+  return null;
 }
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
@@ -79,8 +96,9 @@ export default function SettingsPage() {
 
   function submitUrl() {
     setUrlNotice(null);
-    if (!looksLikeHttpUrl(urlDraft)) {
-      setUrlNotice({ tone: "error", text: errorCopy("invalid_url") });
+    const issue = localUrlIssue(urlDraft);
+    if (issue !== null) {
+      setUrlNotice({ tone: "error", text: errorCopy(issue) });
       return;
     }
     saveUrl.mutate(urlDraft.trim());
