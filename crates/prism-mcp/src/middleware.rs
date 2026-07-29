@@ -138,9 +138,20 @@ pub async fn require_bearer(
 /// 常数时间比较。**不得写成 `expected == presented`**——`==` 在首个不同字节处短路，
 /// 逐字节猜测 token 的时序侧信道由此成立（T-01-06）。
 ///
+/// 空 `expected` 直接返回 false，且是在进入常数时间比较**之前**短路。这与下一段的
+/// 「长度不等时也不提前返回」不矛盾：那条规则守的是「不得因比较**结果**而提前返回」，
+/// 而空 expected 是**配置错误**，不是比较结果——它不随呈递值变化，因此不构成侧信道。
+/// 这里也没有可泄漏的秘密（配置本身就是空的）；真正的泄漏是放行。
+/// 这是 CR-03 纵深的第二层，第一层在 `McpDeps::new`：即便有人绕过构造器造出空配置，
+/// 这里仍拒；即便有人放宽这里，构造器仍拒。两层各有自己的测试。
+///
 /// 长度不等时也不提前返回：把 presented 折进一个与 expected 等长的缓冲区
 /// （超出部分参与折叠而非被丢弃），再与长度比较结果按位与。
 fn constant_time_eq(expected: &str, presented: &str) -> bool {
+    if expected.is_empty() {
+        return false;
+    }
+
     let expected = expected.as_bytes();
     let presented = presented.as_bytes();
 
