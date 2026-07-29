@@ -195,6 +195,16 @@ mod tests {
         );
     }
 
+    /// T-01-20，同上：busy 只陈述规则性事实，不带路径也不带连接数。
+    #[test]
+    fn checkpoint_busy_error_carries_no_path() {
+        let text = crate::error::StoreError::CheckpointBusy.to_string();
+        assert!(
+            !text.contains('/'),
+            "checkpoint-busy error must not carry a path: {text}"
+        );
+    }
+
     /// 第 4 步（迁移）必须排在第 5 步（建池）之前。
     ///
     /// 这条断言看的是源码顺序，不是行为——因为**行为测不出来**：实测把建池挪到迁移之前，
