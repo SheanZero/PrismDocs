@@ -130,12 +130,31 @@ export default function SettingsPage() {
 
       <section style={card}>
         <h2>LLM API key</h2>
+        {/*
+          显式四态：pending / error / 有值 / 无值。**「读失败」不得落进「未配置」**——
+          两者在界面上完全同形，而用户对「未配置」的反应是重新输入密钥；那次保存也会
+          失败（钥匙串本来就不可用），且他仍然不知道原因。被拒的查询在 TanStack Query
+          里以 `isPending === false` + `data === undefined` 落定，正好长成「没配置」。
+        */}
         <p>
           当前状态：
           <strong data-testid="api-key-status">
-            {keyStatus.isPending ? "读取中…" : keyStatus.data ? "已配置" : "未配置"}
+            {keyStatus.isPending
+              ? "读取中…"
+              : keyStatus.isError
+                ? "读取失败"
+                : keyStatus.data
+                  ? "已配置"
+                  : "未配置"}
           </strong>
         </p>
+        <NoticeLine
+          notice={
+            keyStatus.isError
+              ? { tone: "error", text: errorCopy(keyStatus.error) }
+              : null
+          }
+        />
         <p style={hint}>
           密钥存进 macOS 钥匙串（service <code>PrismDocs</code> / account{" "}
           <code>llm_api_key</code>），不入数据库；本页只显示配置状态，任何时候都不回显原文。
@@ -173,9 +192,23 @@ export default function SettingsPage() {
 
       <section style={card}>
         <h2>LLM 端点</h2>
+        {/* 同上：读失败**不得**落到「（未设置）」那一支。真的没设置与读不出来，
+            用户要做的事不一样，而两句话在界面上原本一模一样。 */}
         <p style={hint}>
-          当前值：<code>{baseUrl.data ?? "（未设置）"}</code>
+          当前值：
+          <code>
+            {baseUrl.isPending
+              ? "读取中…"
+              : baseUrl.isError
+                ? "读取失败"
+                : (baseUrl.data ?? "（未设置）")}
+          </code>
         </p>
+        <NoticeLine
+          notice={
+            baseUrl.isError ? { tone: "error", text: errorCopy(baseUrl.error) } : null
+          }
+        />
 
         <label htmlFor="base-url">LLM 端点（base_url）</label>
         <input
