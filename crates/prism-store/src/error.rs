@@ -41,6 +41,14 @@ pub enum StoreError {
     #[error("database is not in wal mode: {0}")]
     JournalModeNotWal(String),
 
+    /// TRUNCATE checkpoint 报告 busy：仍有连接持有 WAL，`-wal` 里的内容没能搬回主库。
+    ///
+    /// 后果是数据完整性风险——备份走了主库却漏掉未 checkpoint 的部分。消息只陈述这条
+    /// **规则性事实**，不带路径也不带连接数（T-01-20）。短码同 [`Self::JournalModeNotWal`]，
+    /// 走 `EngineError::Store(_)` 兜底臂，IPC 契约不动。
+    #[error("wal checkpoint did not complete: connections still hold the wal")]
+    CheckpointBusy,
+
     /// 写入 `settings` 的键名不被接受（当前唯一的拒绝理由是「疑似密钥」）。
     /// 消息只带键名与规则，**不带 value**——被误填进来的很可能就是密钥本身（T-01-26）。
     #[error("invalid setting: {0}")]

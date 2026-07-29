@@ -152,12 +152,19 @@ impl Store {
     /// 收尾：把 WAL 全量搬回主库并把 `-wal` 截断。
     ///
     /// 先扔掉只读池——TRUNCATE checkpoint 在还有其他连接开着时会「成功但没做事」
-    /// （返回 busy 标志而不是报错），那正是这类 bug 静默的地方。
+    /// （返回 busy 标志而不是报错）。扔池只是让这种情况变得不太可能，不是不可能：另一个
+    /// 线程上还没归还的 `PooledConnection`、或关停时仍停在 `read()` 闭包里的读者，都能复现它。
+    /// busy 列现在被读出来并上报，这类 bug 不再静默——代价是备份可能漏掉未 checkpoint 的
+    /// WAL 内容，那是数据完整性问题，值得一个会响的出口。
     pub fn close(self) -> Result<(), StoreError> {
         let Store { writer, readers } = self;
         drop(readers);
         let conn = writer.into_inner().unwrap_or_else(|e| e.into_inner());
-        conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
+        // 第 0 列就是 busy 标志：0 = checkpoint 跑完了，1 = 没跑成。
+        let busy: i64 = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| r.get(0))?;
+        if busy != 0 {
+            return Err(StoreError::CheckpointBusy);
+        }
         Ok(())
     }
 }
@@ -203,6 +210,41 @@ mod tests {
             !text.contains('/'),
             "checkpoint-busy error must not carry a path: {text}"
         );
+    }
+
+    /// busy 分支的行为哨兵：另一条连接持着未提交的读事务时，TRUNCATE checkpoint 无法
+    /// reset WAL，`close()` 必须报错而不是静默成功。
+    ///
+    /// **这条测试耗约 5 秒**——checkpointer 会先走满 writer 上的 `BUSY_TIMEOUT_MS` 才认输。
+    /// 值这个价钱：把它删掉，`close()` 里读 busy 列的那三行就再没有任何行为面的保护，
+    /// 下一次重构把它改回 `|_| Ok(())`（这正是上轮 WR-03 的原样）不会有任何东西变红。
+    #[test]
+    fn close_reports_busy_when_another_connection_holds_the_wal() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("t.db");
+        let store = super::open(&db_path).expect("open store");
+        store
+            .write(|tx| {
+                tx.execute(
+                    "INSERT INTO projects(id,name,root_path,created_at) VALUES(?1,'P','/tmp',0)",
+                    ["p"],
+                )?;
+                Ok(())
+            })
+            .expect("write row");
+
+        // 裸连接持一个未提交的读事务：checkpointer 无法 reset WAL。
+        let squatter = rusqlite::Connection::open(&db_path).expect("squatter");
+        squatter
+            .execute_batch("BEGIN; SELECT count(*) FROM projects;")
+            .expect("hold a read txn");
+
+        let err = store.close().expect_err("close should report busy");
+        assert!(
+            matches!(err, crate::error::StoreError::CheckpointBusy),
+            "expected CheckpointBusy, got {err:?}"
+        );
+        drop(squatter);
     }
 
     /// 第 4 步（迁移）必须排在第 5 步（建池）之前。
