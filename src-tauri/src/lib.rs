@@ -3,6 +3,7 @@
 //! 壳只做三件事：解析 sidecar 路径、装配 facade、把命令注册进 IPC。
 //! 任何业务逻辑都属于 engine 侧（Anti-Pattern 1）。
 
+pub mod bus_adapter;
 pub mod commands;
 
 use std::sync::Arc;
