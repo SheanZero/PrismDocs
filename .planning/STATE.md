@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-10-PLAN.md（gap 1 engine+前端两半均已关闭）
-last_updated: "2026-07-29T04:00:21.051Z"
+stopped_at: Completed 01-11-PLAN.md（gap 2 关闭：扫描器失明修复 + selftest 自证）
+last_updated: "2026-07-29T04:11:37.413Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 13
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 2 of 13
+Plan: 12 of 13
 Status: Ready to execute
 Last activity: 2026-07-29 — Phase 01 execution started
 
-Progress: [████████░░] 77%
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [████████░░] 77%
 | Phase 01 P08 | 11min | 2 tasks | 9 files |
 | Phase 01 P09 | 81min | 3 tasks | 19 files |
 | Phase 01 P10 | 10min | 2 tasks | 4 files |
+| Phase 01 P11 | 15min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,12 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-10: 拒绝面扩张时不加 StoreError 变体（复用 InvalidUrl）——加变体会连带要求 commands.rs::map_err 与前端 ERROR_COPY 同步扩表，那是 IPC 短码契约的变更；「是凭据还是 scheme」的区分只在前端本地校验层做得到
 - [Phase ?]: 01-10: 前端体验层校验返回错误码而非布尔（localUrlIssue 取代 looksLikeHttpUrl）；判定面与 engine 逐项对齐（scheme/userinfo/query/fragment），避免「前端放行、engine 拒绝」在正常输入上出现
 - [Phase ?]: 01-10: 计划里的两条断言实测不成立须就地修正——单字符用户名 u 让「错误串不含用户名」恒假；type=text 的端点输入框必须回显用户输入，document.body.innerHTML 级的不回显断言在任何正确实现下都红。不回显的守法面是**错误文案**，不是整个 DOM
+- [Phase ?]: 01-11: sk- 段的字符类扩到 [A-Za-z0-9_-] 与长度下界 16→20 是同一个改动的两半——只放宽字符类会把普通连字符标识符扫进来，用误报换漏报。反证 F 与 H1/H2 的落点互补，证明两者是独立的判别维度
+- [Phase ?]: 01-11: 检测控件必须自证判别力——失明的扫描器与干净的仓库退出码相同。selftest（14 阳性 / 7 阴性，与 scan 共用同一个 $PATTERN 变量，源码断言只赋值一次）把这件事变成每次 CI 重跑的断言
+- [Phase ?]: 01-11: 扫描器不排除自身，阳性样本一律由片段拼出——scan 退出 0 即为「源码里没有命中自身正则的字面量」的可执行证明；docs/ 整目录排除按实测（零命中）取消，排除集只剩 .planning/
+- [Phase ?]: 01-11: fixture 撞上扫描器时改 fixture 不改防线（放宽正则 / 加 allowlist / 加整目录排除 / 降阈值四者都算放宽）。两处新命中以改名解决（secret→fixture_bearer、token→configured），allowlist 零新增
+- [Phase ?]: 01-11: 闸门在 justfile 与 CI 两处都显式写 all 而非靠无参数默认值——默认值哪天改回 scan-only，CI 会静默失去 selftest 那一半并照常绿；all 的顺序是 selftest 先、scan 后（先红的应当是原因而不是后果）
+- [Phase ?]: 01-11: INFRA-03 仍不勾——证据侧（静态扫描能看见明文密钥）与写入侧（01-10）两半均已关闭，但需求文本的「支持 Anthropic/OpenAI 兼容端点」半句要到 Phase 4 才有 chat client（沿用 01-09/01-10 同一判据）
 
 ### Pending Todos
 
@@ -133,7 +140,8 @@ None yet.
 - ~~[01-09 / Phase 2+]: 若将来给项目加 capabilities/ 目录，has_app_acl_manifest 变 true，即使本地来源也会走 ACL —— src-tauri/tests/ipc.rs 届时需加一份测试用 capability，否则集体变红~~ — 实测不成立 (01-09)：capability 已加入，`cargo test -p prismdocs-shell --features test --test ipc` 仍 2 passed。被测的十个命令都是 `generate_handler!` 注册的自有命令、不受 ACL 管辖；ACL 生效影响的是**插件**命令，ipc 测试里一个都没有。若 Phase 6 给 ipc 测试加插件命令用例，那时才需要测试用 capability
 - [Phase 2+ 每次新增前端 Tauri API 用法]: 任何新的 `@tauri-apps/api` import（fs/dialog/window/webview/http…）都必须在 `src-tauri/capabilities/default.json` 补一行权限，**其缺席表现为静默无操作而非报错**（ACL 只管插件命令，自有命令不过 ACL）；且新调用点必须自己接住并呈现 rejection，否则连「是不是 capability 缺了」都无从判断。`capabilities.test.ts` 挡得住「顺手加个 fs:default」的过宽修复，挡不住忘记加
 - [Phase 2+ 每次写前端交互测试]: 单测会替被测系统假设掉前置条件——jsdom 替用户完成「输入 hash」（01-09 缺陷 1：冒烟页在真实窗口不可达而路由断言全绿）、mock 替运行时完成「ACL 放行」（01-09 缺陷 2）。两者的症状都是「什么都没发生，也没有报错」。这是 01-06 / 01-08 那族问题的第三、第四个变种，共同解药只有「把被测性质放进一个没有替身的链路里跑一次」
-- [01-11 完成前] INFRA-03 仍不勾：01-10 只关闭了写入侧（凭据型 base_url 不入库），静态扫描能否看见明文密钥由 01-11 关闭；且需求文本的「支持 Anthropic/OpenAI 兼容端点」半句要到 Phase 4 才有 chat client（沿用 01-09 的同一判据）
+- [Phase 4 前] INFRA-03 仍不勾：~~01-10 只关闭了写入侧（凭据型 base_url 不入库），静态扫描能否看见明文密钥由 01-11 关闭~~ — 两半均已关闭（01-10 写入侧 / 01-11 证据侧，扫描器对 01-VERIFICATION.md § SC-4 取样表命中率 1/5 → 5/5）。剩余阻塞只有需求文本的「支持 Anthropic/OpenAI 兼容端点」半句——要到 Phase 4 才有 chat client（沿用 01-09 的同一判据）
+- [Phase 2+ 每次新增 fixture / 测试局部变量]: 名字像密钥的标识符后跟一个引号串会被 `scripts/check-secrets.sh` 抓住，这是它该抓的形状。撞车时改 fixture 的名字或值，**不动扫描器**——放宽正则 / 加 allowlist / 加整目录排除 / 降长度阈值四者都算放宽。判断标准：若某个改动会让 selftest 的某条阴性样本被误命中、或某条阳性样本不再命中，那就是在放宽防线
 
 ## Deferred Items
 
@@ -145,6 +153,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T03:59:34.615Z
-Stopped at: Completed 01-10-PLAN.md（gap 1 engine+前端两半均已关闭）
+Last session: 2026-07-29T04:11:00.842Z
+Stopped at: Completed 01-11-PLAN.md（gap 2 关闭：扫描器失明修复 + selftest 自证）
 Resume file: None

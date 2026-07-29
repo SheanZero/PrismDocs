@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 6
+open_count: 7
 waived_count: 0
 fixed_count: 0
-total_count: 6
-last_updated: 2026-07-29T02:21:00.347Z
+total_count: 7
+last_updated: 2026-07-29T04:11:54.094Z
 ---
 
 # Broken Windows Ledger
@@ -21,6 +21,7 @@ last_updated: 2026-07-29T02:21:00.347Z
 | 4 | 01 | deviation | src-tauri/tests/ipc.rs |  | 研究文档示例的 ipc 请求 URL (http://tauri.localhost) 在 macOS 上非本地来源，会让每个命令被 ACL 拒成 'not allowed. Plugin not found'——其错误串与真正的未注册错误同含 'not found'，无负对照时测试会绿着什么都没测 | open |  | 2026-07-29T00:42:43.308Z |  |
 | 5 | 01 | deviation | src/App.tsx |  | 冒烟页在真实 Tauri 窗口里不可达（窗口无地址栏，计划的「靠地址栏进入 #/dev」不可执行）；而「hash 是 #/dev 时渲染谁」的路由断言在冒烟页永远够不着的世界里同样全绿——路由正确性不蕴含可达性 | open |  | 2026-07-29T02:21:00.297Z |  |
 | 6 | 01 | deviation | src-tauri/capabilities/default.json |  | listen() 被 Tauri v2 ACL 拒绝且 rejection 被吞：capabilities/ 缺失时 ACL 集合编译成 {}；ACL 只管插件命令，generate_handler! 的自有命令不过 ACL——于是 invoke 全部正常、listen 从未注册、计数停在 0 且零报错。vitest 里 event 模块被 mock，这一整类失败在单测中结构上不可见 | open |  | 2026-07-29T02:21:00.347Z |  |
+| 7 | 01 | deviation | scripts/check-secrets.sh |  | INFRA-03 未勾：需求文本「支持 Anthropic/OpenAI 兼容端点」半句需 Phase 4 chat client；扫描器与写入侧两半已关闭 | open |  | 2026-07-29T04:11:54.094Z |  |
 
 ````json
 [
@@ -94,6 +95,18 @@ last_updated: 2026-07-29T02:21:00.347Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-29T02:21:00.347Z",
+    "resolved_at": null
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "scripts/check-secrets.sh",
+    "line": null,
+    "description": "INFRA-03 未勾：需求文本「支持 Anthropic/OpenAI 兼容端点」半句需 Phase 4 chat client；扫描器与写入侧两半已关闭",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T04:11:54.094Z",
     "resolved_at": null
   }
 ]

@@ -253,3 +253,7 @@ widen 后全仓恰好两处新命中，都在 prism-mcp 测试里，都是「局
 - **Phase 4 引入 chat client 时**：`prism-llm` 会第一次出现真实的 Authorization 头构造代码。阳性组第 4 条（`Authorization: "Bearer sk-ant-api03-…"`）就是为那一刻准备的——届时任何把真实 token 写进测试的做法都会当场变红。
 - **INFRA-03 的证据侧至此解除阻塞**，但需求文本的「支持 Anthropic / OpenAI 兼容端点」半句仍要到 Phase 4 才有 chat client（沿用 01-09 / 01-10 的同一判据）。
 - **`docs/` 若将来要引用正则**：只排除那一个文件路径，并在 `scan()` 的注释里写明是哪篇、为什么——注释里已经预留了这句话的位置。
+
+## Self-Check: PASSED
+
+五个被改文件与 SUMMARY 全部存在；三个 commit（`1b4ef33` / `e371283` / `b4c8bca`）全部可在 `git log --all` 中找到；三个 commit 均无文件删除。收尾复跑：`bash scripts/check-secrets.sh all` exit 0、`bash scripts/check-deps.sh all` exit 0。
