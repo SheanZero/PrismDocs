@@ -4,16 +4,16 @@ milestone: v0.2
 milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
-status: ready_to_execute
-stopped_at: Completed 01-12-PLAN.md; planned second gap-closure round (01-14..01-28)
-last_updated: "2026-07-29T07:35:00.000Z"
+status: executing
+stopped_at: Completed 01-14-PLAN.md
+last_updated: "2026-07-29T11:59:40.676Z"
 last_activity: 2026-07-29
-last_activity_desc: Phase 01 second gap-closure round planned (15 plans, 01-14..01-28)
+last_activity_desc: 01-14 完成：check-secrets 关键词分支裸值可见 + scan 作用域固定
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # Project State
@@ -27,17 +27,19 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 01 (foundation-skeleton) — PLANNED (第二轮缺口修补)
-Plan: 13 of 28（01-01..01-13 已执行；01-14..01-28 为第二轮缺口修补集，尚未执行）
-Status: Ready to execute
-Last activity: 2026-07-29 — 第二轮缺口修补集规划完成（15 份计划，6 波）
+Phase: 01 (foundation-skeleton) — EXECUTING
+Plan: 14 of 28（01-01..01-14 已执行；下一份 01-15）
+Status: Executing Phase 01
+Last activity: 2026-07-29 — 01-14 完成：check-secrets 关键词分支裸值可见 + scan 作用域固定
 
-Progress: [████░░░░░░] 46%
+Progress: [█████░░░░░] 50%
 
-**为什么 Phase 1 尚未 Complete：** `01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
+**为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
-TOML / CI `env:`）整类不可见，而这正是「代码与**配置**中无明文密钥」里「配置」那一半。**状态为真**
-（三组独立宽扫确认当前仓库零明文密钥），失守的是执行机制。`01-14` 单独成波关闭它。
+TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支的值改为「引号串{8,} 或 裸值{16,}」
+两者取一，补 `github_pat_` / `xox[baprs]-` / `AIza` 三条前缀；`scan` 固定 cwd 到仓库根并加扫描面
+下限断言（WR-09）。四条非恒真反证实跑（见 01-14-SUMMARY.md）。**已知残留**：SC-4 取样表第 5 行
+`password = hunter2hunter2` 值仅 14 字符，落在裸值下界之下——已写进源码注释，不下调阈值。
 其余 14 份处理两轮评审累积的 36 条 warning/info（用户定的范围：全部清干净再进 Phase 2）。
 
 ## Performance Metrics
@@ -77,6 +79,7 @@ TOML / CI `env:`）整类不可见，而这正是「代码与**配置**中无明
 | Phase 01 P11 | 15min | 2 tasks | 5 files |
 | Phase 01 P13 | 14min | 3 tasks | 7 files |
 | Phase 01 P12 | 6min | 2 tasks | 6 files |
+| Phase 01 P14 | 25min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -142,6 +145,11 @@ Recent decisions affecting current work:
 - [Phase ?]: McpError::EmptyBearer 文案零插值——Phase 6 被拒的值可能是真 token 的畸形前缀，错误只陈述规则不回显值（T-01-29 同源）
 - [Phase ?]: 比较层只加一条空 expected 早退，不做 WR-15 整体重写：绑定两件事会让「哪一层挡住了」的反证落点不再唯一
 - [Phase ?]: 被单测钉住的 fail-open 行为用反转断言而非删除断言修复——被删掉的形态就是没人看着的形态
+- [Phase ?]: 01-14: 裸值段下界取 16 且严格高于引号段的 8——引号串本身是「有人刻意写了字面量」的强信号，裸值没有；低下界会让 token = self.inner.value 这类表达式赋值整片误报，而被误报烦到的人会绕开闸门
+- [Phase ?]: 01-14: SC-4 取样表第 5 行（password = hunter2hunter2，值仅 14 字符）作为已知残留写进源码注释，不下调阈值也不编成阴性断言——把已知缺口写成绿色的期望性质比留着缺口更坏
+- [Phase ?]: 01-14: scan 的 cwd 固定（防线）与扫描面下限断言（报警器）成对存在——单有防线时它被删掉仍表现为绿，下限让作用域收窄从 OK/exit 0 变成 FAIL/exit 1
+- [Phase ?]: 01-14: 检测控件每次扩宽都必须配一条只能经新分支命中的样本——否则旧分支替新分支兜底，selftest 从「不完整」变成「有误导性」（CR-01 的形态）
+- [Phase ?]: 01-14: INFRA-03 仍不勾——证据侧（扫描器现在看得见裸值配置形态）与写入侧（01-10）两半均已关闭，但需求文本的「支持 Anthropic/OpenAI 兼容端点」半句要到 Phase 4 才有 chat client（沿用 01-09/01-10/01-11 同一判据）
 
 ### Pending Todos
 
@@ -175,6 +183,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T05:44:58.638Z
-Stopped at: Completed 01-12-PLAN.md
+Last session: 2026-07-29T11:59:12.172Z
+Stopped at: Completed 01-14-PLAN.md
 Resume file: None
