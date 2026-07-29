@@ -203,6 +203,86 @@ mod tests {
         assert_eq!(count(&store), 1);
     }
 
+    /// 凭据藏在**值**里而不是键名里时，`is_secret_like_key` 完全看不见它:
+    /// `llm.base_url` 这个键名再正常不过，而 `https://user:key@host/v1` 里的那串东西
+    /// 会原样落进 `settings.value`，随 sidecar 目录整体备份离开本机
+    /// （`docs/keychain-naming.md` 不变量 1 给出的正是这个理由）。
+    ///
+    /// 六组断言，每一条被删掉之后都会有一个具体的静默失败模式重新变得可能——
+    /// 见每条旁边的注释。
+    #[test]
+    fn settings_base_url_rejects_credential_bearing_values() {
+        // fixture 的密码位刻意不用 `sk-` 开头的长串（与 prism-llm 的 FIXTURE_SECRET 同一约定）：
+        // 它对守卫的行使与真密钥无差别（`url.password()` 同样返回 `Some`），
+        // 却不会让 check-secrets.sh 为了迁就 fixture 而放宽。
+        const CREDENTIAL_USER: &str = "prism-test-user";
+        const CREDENTIAL_PASS: &str = "prism-test-secret-value";
+        const USER_AND_PASS: &str =
+            "https://prism-test-user:prism-test-secret-value@api.vendor.com/v1";
+        const USER_ONLY: &str = "https://prism-test-user@api.vendor.com/v1";
+        const IN_QUERY: &str = "https://api.vendor.com/v1?api-key=prism-test-secret-value";
+        const IN_FRAGMENT: &str = "https://api.vendor.com/v1#prism-test-secret-value";
+
+        // ① 纯函数拒绝。删掉 userinfo 分支 → 前两条重新通过；删掉 query/fragment 分支
+        //    → 后两条重新通过。两种放行都表现为「保存成功」，没有任何报错。
+        //    只有用户名没有密码的形态（USER_ONLY）单独列出：`password()` 在那里是 `None`，
+        //    只看 password 的守卫会漏掉它。
+        for bad in [USER_AND_PASS, USER_ONLY, IN_QUERY, IN_FRAGMENT] {
+            assert!(
+                matches!(validate_base_url(bad), Err(StoreError::InvalidUrl(_))),
+                "携带凭据的 base_url 应被拒绝: {bad:?} 实得 {:?}",
+                validate_base_url(bad)
+            );
+        }
+
+        let (_dir, store) = fixture();
+
+        // ② 判别性所在：校验必须长在 `set_setting` 的**写入路径**上，而不是指望调用方
+        //    先记得调 `validate_base_url`。这一条被删掉之后，「守卫是约定而非机制」
+        //    就重新成为可能——绕过界面直接 invoke 即可写入。
+        let rejected = store.write(|tx| set_setting(tx, SETTING_BASE_URL, USER_AND_PASS));
+        assert!(
+            matches!(rejected, Err(StoreError::InvalidUrl(_))),
+            "带凭据的 base_url 在写入路径上应返回 InvalidUrl，实得 {rejected:?}"
+        );
+
+        // ③ 未留痕。缺了这一条，一个「先 INSERT 再报错」的实现也会绿——
+        //    而备份带走的是表里的行，不是返回值。
+        assert_eq!(count(&store), 0, "被拒的带凭据 base_url 不得进表");
+
+        // ④ 不回显（T-01-26）。被误填进 base_url 的那串东西很可能就是密钥本身，
+        //    而错误消息一路冒泡到本地日志与前端 DOM。
+        let msg = validate_base_url(USER_AND_PASS).unwrap_err().to_string();
+        assert!(
+            !msg.contains(CREDENTIAL_USER),
+            "错误消息不得回显用户名: {msg}"
+        );
+        assert!(
+            !msg.contains(CREDENTIAL_PASS),
+            "错误消息不得回显密码: {msg}"
+        );
+
+        // ⑤ 幂等。守卫无状态，第一次拒绝不会给第二次开门——
+        //    缺了这一条，一个「只在首次写入时校验」的实现也会绿。
+        let again = store.write(|tx| set_setting(tx, SETTING_BASE_URL, USER_AND_PASS));
+        assert!(
+            matches!(again, Err(StoreError::InvalidUrl(_))),
+            "同一带凭据 URL 第二次写入仍应被拒，实得 {again:?}"
+        );
+        assert_eq!(count(&store), 0, "第二次被拒后 settings 表仍应为空");
+
+        // ⑥ 阴性对照。守卫若写成「一律拒绝」，上面五条全都会绿——
+        //    而那是一个把设置页彻底废掉的「修复」。
+        assert!(
+            validate_base_url("https://api.example.com/v1").is_ok(),
+            "干净的 https 端点仍应被接受"
+        );
+        store
+            .write(|tx| set_setting(tx, SETTING_BASE_URL, "https://api.example.com/v1"))
+            .expect("干净的 base_url 应写入成功");
+        assert_eq!(count(&store), 1, "干净的 base_url 应恰好写入一行");
+    }
+
     #[test]
     fn settings_rejects_secret_like_keys() {
         let (_dir, store) = fixture();
