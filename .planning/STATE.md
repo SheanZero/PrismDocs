@@ -4,16 +4,16 @@ milestone: v0.2
 milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
-status: executing
-stopped_at: Completed 01-08-PLAN.md
-last_updated: "2026-07-29T00:42:57.812Z"
+status: verifying
+stopped_at: Completed 01-09-PLAN.md（phase 01 全部 9 个 plan 执行完毕，待 verify）
+last_updated: "2026-07-29T02:21:33.543Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 Phase: 01 (foundation-skeleton) — EXECUTING
 Plan: 9 of 9
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-28 — Phase 01 execution started
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [█████████░] 89%
 | Phase 01 P06 | 26min | 2 tasks | 10 files |
 | Phase 01 P07 | 31min | 2 tasks | 9 files |
 | Phase 01 P08 | 11min | 2 tasks | 9 files |
+| Phase 01 P09 | 81min | 3 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-08: ipc 进程内测试的来源 URL 必须等于 tauri.conf.json 的 devUrl —— http://tauri.localhost 是 Windows 形态，macOS 下 is_local=false 会让每个命令被 ACL 拒成 'not allowed. Plugin not found'（与未注册错误同含 not found）
 - [Phase ?]: 01-08: check-deps.sh 补第六条 shell-egress（src-tauri 不得直接依赖 prism-llm），形态同 facade-egress；反证证明原五条对该缺口全部不敏感
 - [Phase ?]: 01-08: 有序性断言用序列比较而非集合比较；命令注册断言必须配未注册命令的负对照 + 断言 Ok（而非仅'错误不像未注册'）
+- [Phase ?]: 01-09: Tauri v2 的 ACL 只管插件命令——generate_handler! 注册的自有命令不过 ACL。capabilities/ 缺失时 listen() 被拒而 invoke 全部正常，表现为「点了没反应且零报错」；任何新的 @tauri-apps/api 用法都需补一行 capability，且新调用点必须自己呈现 rejection
+- [Phase ?]: 01-09: 可达性是独立于路由正确性的性质——「hash 是 X 时渲染谁」全绿不代表用户到得了 X（Tauri 窗口没有地址栏）。dev-only UI 用 import.meta.env.DEV 门控并配一条生产构建断言（grep dist 产物）
+- [Phase ?]: 01-09: 勾选 INFRA-01（成功标准 2 的真实 WebView 两条通路由人工验证兑现）；INFRA-03 不勾——prism-llm 只有 secrets.rs，无 chat client，「支持 Anthropic/OpenAI 兼容端点」到 Phase 4
 
 ### Pending Todos
 
@@ -120,7 +124,9 @@ None yet.
 - [数据勘误]: REQUIREMENTS.md 原 Coverage 写 51 条，实际 v1 REQ-ID 为 61 条，已于 roadmap 创建时更正
 - [每个 plan 执行时]: 反证本身需要被验证（01-03 后第三次出现）：01-05 的计划反证 C 实跑不成立，暴露了 LIKE 分支缺阴性对照；触发器 DELETE 路径的验证按计划写法恒真（JOIN 掩盖了陈旧索引条目）；01-06 的两条计划反证（从 build_router 摘掉 Host / Origin 中间件）实跑**全绿**——rmcp SDK 自带的 allowlist 替它拒掉了。跑反证时要看**落点**（红在哪一条断言）而非只看红绿；当被测层之上还有第三方兜底时，反证必须把被测层放进一个**没有兜底**的最小链路里（01-06 的 sentinel-router 隔离测试即此形态）。
 - [Phase 6 计划时]: rmcp SDK 的 Host 拒绝响应体为 "Forbidden: Host header is not allowed"，与本项目 T-01-29 的无差别拒绝口径不一致。当前应用层在外先拒使其不可达，但若 Phase 6 调整中间件顺序或 allowlist 使两者不再等价，SDK 的正文会泄漏落点
-- [01-09 / Phase 2+]: 若将来给项目加 capabilities/ 目录，has_app_acl_manifest 变 true，即使本地来源也会走 ACL —— src-tauri/tests/ipc.rs 届时需加一份测试用 capability，否则集体变红
+- ~~[01-09 / Phase 2+]: 若将来给项目加 capabilities/ 目录，has_app_acl_manifest 变 true，即使本地来源也会走 ACL —— src-tauri/tests/ipc.rs 届时需加一份测试用 capability，否则集体变红~~ — 实测不成立 (01-09)：capability 已加入，`cargo test -p prismdocs-shell --features test --test ipc` 仍 2 passed。被测的十个命令都是 `generate_handler!` 注册的自有命令、不受 ACL 管辖；ACL 生效影响的是**插件**命令，ipc 测试里一个都没有。若 Phase 6 给 ipc 测试加插件命令用例，那时才需要测试用 capability
+- [Phase 2+ 每次新增前端 Tauri API 用法]: 任何新的 `@tauri-apps/api` import（fs/dialog/window/webview/http…）都必须在 `src-tauri/capabilities/default.json` 补一行权限，**其缺席表现为静默无操作而非报错**（ACL 只管插件命令，自有命令不过 ACL）；且新调用点必须自己接住并呈现 rejection，否则连「是不是 capability 缺了」都无从判断。`capabilities.test.ts` 挡得住「顺手加个 fs:default」的过宽修复，挡不住忘记加
+- [Phase 2+ 每次写前端交互测试]: 单测会替被测系统假设掉前置条件——jsdom 替用户完成「输入 hash」（01-09 缺陷 1：冒烟页在真实窗口不可达而路由断言全绿）、mock 替运行时完成「ACL 放行」（01-09 缺陷 2）。两者的症状都是「什么都没发生，也没有报错」。这是 01-06 / 01-08 那族问题的第三、第四个变种，共同解药只有「把被测性质放进一个没有替身的链路里跑一次」
 
 ## Deferred Items
 
@@ -132,6 +138,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T00:42:48.539Z
-Stopped at: Completed 01-08-PLAN.md
+Last session: 2026-07-29T02:21:33.538Z
+Stopped at: Completed 01-09-PLAN.md（phase 01 全部 9 个 plan 执行完毕，待 verify）
 Resume file: None
