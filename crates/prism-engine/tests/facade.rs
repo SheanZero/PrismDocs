@@ -98,8 +98,10 @@ async fn bus_broadcasts_to_multiple_subscribers() {
     let bus = EventBus::new();
     let mut rx1 = bus.subscribe();
     let mut rx2 = bus.subscribe();
-    assert_eq!(bus.subscriber_count(), 2, "前置条件：两个独立订阅者");
-
+    // 刻意**不**在这里断言 `subscriber_count() == 2`：那条前置条件由
+    // `bus::tests::subscribing_twice_yields_two_independent_receivers` 承担。
+    // 放在这里会抢在下面那条断言之前变红，让「第二个订阅者收不到」这个反证
+    // 落到前置条件上而不是落到它要守的那条断言上。
     bus.publish(sample_event());
 
     let first = recv_within(&mut rx1, "第一个订阅者").await;

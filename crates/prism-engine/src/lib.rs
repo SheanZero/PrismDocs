@@ -1,40 +1,28 @@
-//! Facade：shell 与 MCP 之外的一切编排都发生在这里。
+//! 编排层（facade）：shell 与 MCP 之外的一切编排都发生在这里。
 //!
-//! **不依赖 tauri**（D-01）。Phase 1 plan 01（tracer）只提供 `new` / `ping`，
-//! 用来证明 shell → facade → store → SQLite 这条方向是真的委托而非硬编码。
+//! **不依赖 tauri**（D-01）——这是本 crate 存在的理由：Tauri shell 只是薄壳，
+//! 所有编排在这一层，因此这一层必须能在没有 tauri 的情况下被完整测试
+//! （`cargo test -p prism-engine` 的输出里不出现 `Compiling tauri v`）。
+//!
+//! 三个模块各守一条边界：
+//!
+//! * [`bus`] —— 事件总线（engine 唯一的订阅点）
+//! * [`facade`] —— [`Engine`]：单写者句柄的持有者与三条门面路径的编排
+//! * `services` —— `impl FeedbackSource / CommentSink for Engine`（D-09 的注入面，Task 2 落地）
 
-use std::sync::Arc;
+pub mod bus;
+pub mod error;
+pub mod facade;
 
-use prism_store::{Store, StoreError};
-
-#[derive(Debug, thiserror::Error)]
-pub enum EngineError {
-    #[error(transparent)]
-    Store(#[from] StoreError),
-}
-
-pub struct Engine {
-    store: Arc<Store>,
-}
-
-impl Engine {
-    pub fn new(store: Arc<Store>) -> Engine {
-        Engine { store }
-    }
-
-    /// 端到端探针：把 store 报告的 SQLite 版本原样送回调用方。
-    pub fn ping(&self) -> Result<String, EngineError> {
-        Ok(self.store.sqlite_version()?)
-    }
-
-    pub fn types_crate_version(&self) -> &'static str {
-        prism_types::CRATE_VERSION
-    }
-}
+pub use bus::{EventBus, BUS_CAPACITY};
+pub use error::EngineError;
+pub use facade::Engine;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prism_store::Store;
+    use std::sync::Arc;
 
     fn engine_on_temp_db() -> (tempfile::TempDir, Engine) {
         let dir = tempfile::TempDir::new().expect("tempdir");

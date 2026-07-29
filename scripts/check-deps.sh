@@ -19,8 +19,15 @@ ENGINE_CRATES="prism-types prism-store prism-fs prism-parse prism-anchor prism-l
 # 公证与体积问题会到 Phase 6 才炸；纳入这条断言的成本是零。
 TAURI_FREE_CRATES="$ENGINE_CRATES prism-cli"
 
-# single-egress 的受检集合：排除被允许触网/触密钥的两个包（LLM 客户端与 CLI helper）。
-PURE_CRATES="prism-types prism-store prism-fs prism-parse prism-anchor prism-engine"
+# single-egress 的受检集合：**叶子** engine crate。它们的整棵普通依赖树里都不得出现
+# 网络/密钥包——这几个 crate 没有任何理由碰到它们。
+#
+# 排除三个：prism-llm 与 prism-cli 是被允许触网/触密钥的（NFR-03 的那个「唯一出口」
+# 就是 prism-llm）；prism-engine 另有一条更精确的断言，见 check_facade_egress。
+PURE_CRATES="prism-types prism-store prism-fs prism-parse prism-anchor"
+
+# 网络/密钥包的名字。两条断言共用。
+EGRESS_CRATES='reqwest|keyring-core|apple-native-keyring-store'
 
 # 成功标准 1-b：同一进程不得链接两份 SQLite / HTTP 栈。
 # --duplicates 只列多版本共存的包，命中即意味着 WAL 状态可能分叉。
@@ -63,17 +70,57 @@ check_no_cycle() {
   echo "OK: prism-mcp -> prism-types only"
 }
 
-# 成功标准 4（NFR-03）：网络与密钥只有一个出口。
+# 成功标准 4（NFR-03）第一半：叶子 engine crate 的整棵普通依赖树里没有网络/密钥包。
 check_single_egress() {
   local c out
   for c in $PURE_CRATES; do
     out=$(cargo tree -p "$c" --edges normal --prefix none)
-    if grep -Eq '^(reqwest|keyring-core|apple-native-keyring-store) ' <<<"$out"; then
+    if grep -Eq "^($EGRESS_CRATES) " <<<"$out"; then
       echo "FAIL: $c has network/secret dependency" >&2
       return 1
     fi
   done
-  echo "OK: prism-llm is the sole network+secret crate among engine crates"
+  echo "OK: leaf engine crates carry no network/secret dependency"
+}
+
+# 成功标准 4（NFR-03）第二半：facade 可以**转交**密钥，但不得自己开第二个出口。
+#
+# 为什么 prism-engine 不能沿用上面那条整棵树的断言：src-tauri 只依赖 prism-engine，
+# 所以 shell 通往钥匙串的唯一路线必然经过 facade。要么 facade 依赖 prism-llm，
+# 要么把 prism-llm 直接塞给 shell——后者才是真正破坏「唯一入口」的那个选项。
+# 于是对 facade 的正确断言不是「树里没有」，而是**「只能经 prism-llm 进来」**：
+#
+#   (a) prism-engine 自己的直接依赖里没有网络/密钥包；
+#   (b) 在 prism-engine 的依赖树内，这些包的反向依赖闭包中除 prism-llm 与
+#       prism-engine 自身外，不含任何 prism-* crate。
+#
+# (b) 是真正有牙的一条：哪天 prism-store 或 prism-anchor 悄悄加了 keyring，
+# 它会作为一个新的 prism-* 名字出现在反向闭包里而被抓住——而整棵树的断言
+# 那时只会说「prism-engine 有密钥依赖」，与现状无法区分。
+check_facade_egress() {
+  local direct inverted offenders c
+  direct=$(cargo tree -p prism-engine --edges normal --depth 1 --prefix none | tail -n +2)
+  if grep -Eq "^($EGRESS_CRATES) " <<<"$direct"; then
+    echo "FAIL: prism-engine declares a network/secret crate as a direct dependency" >&2
+    return 1
+  fi
+
+  for c in reqwest keyring-core apple-native-keyring-store; do
+    # 该包不在树里就没什么可查的（--invert 对不存在的包会报错）。
+    if ! cargo tree -p prism-engine --edges normal --prefix none \
+         | grep -Eq "^$c "; then
+      continue
+    fi
+    inverted=$(cargo tree -p prism-engine --edges normal --invert "$c" --prefix none)
+    offenders=$(grep -oE '^prism-[a-z]+' <<<"$inverted" \
+                | sort -u | grep -vE '^(prism-llm|prism-engine)$' || true)
+    if [ -n "$offenders" ]; then
+      echo "FAIL: $c reaches prism-engine through a crate other than prism-llm:" >&2
+      echo "$offenders" >&2
+      return 1
+    fi
+  done
+  echo "OK: prism-engine only ever reaches network/secrets through prism-llm"
 }
 
 main() {
@@ -81,15 +128,22 @@ main() {
     dup)            check_dup ;;
     tauri-free)     check_tauri_free ;;
     no-cycle)       check_no_cycle ;;
-    single-egress)  check_single_egress ;;
+    # single-egress 跑两条：NFR-03 是一条约束，拆成两条断言只是因为 facade 与叶子
+    # crate 的正确形态不同。子命令保持单一，调用方（justfile / CI / 计划验收项）不必知道这件事。
+    single-egress)
+      check_single_egress
+      check_facade_egress
+      ;;
+    facade-egress)  check_facade_egress ;;
     all)
       check_dup
       check_tauri_free
       check_no_cycle
       check_single_egress
+      check_facade_egress
       ;;
     *)
-      echo "usage: $0 [dup|tauri-free|no-cycle|single-egress|all]" >&2
+      echo "usage: $0 [dup|tauri-free|no-cycle|single-egress|facade-egress|all]" >&2
       exit 2
       ;;
   esac
