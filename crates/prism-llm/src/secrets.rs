@@ -41,8 +41,14 @@ pub fn init_default_store() -> Result<(), LlmError> {
 
 /// 写入 LLM API key。对同一 (service, account) 重复写入是幂等的——
 /// 底层 store 更新既有条目而不是追加一条。
+///
+/// 入参先裁剪首尾空白。这是**防御性**的第二道——设置页在提交前已裁剪一次——
+/// 但绕过界面直接 invoke 走的也是这个函数。与 `McpDeps::new` 对 bearer token 的
+/// 归一化同源（01-16）：只用 `trim` 判空却存原值，会造出一个看起来配置好了
+/// 但永远用不了的凭据（`api_key_status()` 报「已配置」，每次调用返回 401，
+/// 而本地没有任何信号指向那个尾随换行）。裁剪只碰首尾，内部空白原样保留。
 pub fn set_api_key(secret: &str) -> Result<(), LlmError> {
-    Entry::new(SERVICE, ACCOUNT_LLM_KEY)?.set_password(secret)?;
+    Entry::new(SERVICE, ACCOUNT_LLM_KEY)?.set_password(secret.trim())?;
     Ok(())
 }
 

@@ -18,19 +18,27 @@ import {
 /// 这一层现在多认一种形态（链接里带凭据），是为了让用户**在按下保存之前**就知道
 /// 那串东西不该填在这里——不是因为它变成了防线。
 ///
-/// 判定项与 engine 侧 `validate_base_url` 逐项对齐（scheme / userinfo / query / fragment），
-/// 这样「前端放过但 engine 拒绝」不会在正常输入上出现。返回 `null` 表示本地看不出问题。
+/// 判定项与 engine 侧 `validate_base_url` 逐项对齐（scheme / host / userinfo / query / fragment）。
+/// **两个方向的分歧都要防**，而且更糟的是反方向那个：
+///   - 前端放过、engine 拒绝 → 用户多等一次 IPC 往返才看到同一句错误，代价有限；
+///   - 前端拒绝、engine 会接受 → 用户看到的是一句自相矛盾的话（输入 `HTTPS://…`
+///     却被告知「链接必须以 http:// 或 https:// 开头」），他没有任何办法照做。
+///
+/// 所以判定**先解析再看结构**，不做任何字节级前缀比较：URL scheme 大小写不敏感，
+/// `URL` 与 engine 侧的 `url` crate 都会把它小写化，而 `startsWith("https://")` 不会。
+/// 顺带消掉了「允许哪些 scheme」这条知识在本函数里被写两遍。
+/// 返回 `null` 表示本地看不出问题。
 function localUrlIssue(raw: string): "invalid_url" | "invalid_url_credentials" | null {
-  const trimmed = raw.trim();
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-    return "invalid_url";
-  }
   let url: URL;
   try {
-    url = new URL(trimmed);
+    url = new URL(raw.trim());
   } catch {
     return "invalid_url";
   }
+  // `protocol` 带尾随冒号且已小写化，与 engine 的 `url.scheme()` 同口径。
+  if (url.protocol !== "http:" && url.protocol !== "https:") return "invalid_url";
+  if (url.hostname === "") return "invalid_url";
+  // 两个条件都要：`https://user@host/v1` 的 `password` 是空串，只看密码会漏。
   if (url.username !== "" || url.password !== "") return "invalid_url_credentials";
   if (url.search !== "" || url.hash !== "") return "invalid_url_credentials";
   return null;
@@ -87,11 +95,20 @@ export default function SettingsPage() {
 
   function submitKey() {
     setKeyNotice(null);
-    if (secretDraft.trim() === "") {
+    // 判空与提交用**同一份值**。「只用 trim 判空却存原值」会造出一个看起来配置好了
+    // 但永远用不了的凭据：从供应商控制台复制的密钥常带尾随换行，它被原样存进钥匙串，
+    // `api_key_status()` 随后报「已配置」，而每次调用返回 401。
+    // engine 侧 `prism_llm::secrets::set_api_key` 也做同一份裁剪（两端都做）。
+    //
+    // 局部变量刻意**不**取名 `secret`：`scripts/check-secrets.sh` 的关键词分支会把
+    // `secret = <16 字符以上的裸值>` 判成提交进仓库的明文密钥。撞车时改代码不改防线
+    // （scripts/check-secrets.sh 文件头的单向约定）。
+    const trimmed = secretDraft.trim();
+    if (trimmed === "") {
       setKeyNotice({ tone: "error", text: "请先填写密钥。" });
       return;
     }
-    saveKey.mutate(secretDraft);
+    saveKey.mutate(trimmed);
   }
 
   function submitUrl() {
