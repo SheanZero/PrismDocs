@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. SQLite schema v1 落地：WAL + 单写者 + r2d2 读池（query_only=ON）并发读写正常；FTS5 中文查询返回非零结果（CJK tokenizer 在 schema v1 定案）；rusqlite_migration 迁移体系可用，bundled SQLite ≥3.51.3
   4. API key 经 keyring-core + apple-native-keyring-store 写入系统钥匙串并可读回，prism-llm 为唯一网络出口与唯一密钥入口，代码与配置中无明文密钥
 
-**Plans**: 9/9 plans executed
+**Plans**: 13 plans — 9 executed, 4 gap-closure pending（来源：01-VERIFICATION.md `gaps_found`，成功标准 4 第三分句失守；用户圈定 2 blocker + 3 pre-phase-2 项）
 
 Plans:
 **Wave 1**
@@ -72,6 +72,16 @@ Plans:
 **Wave 7** *(blocked on Wave 6 completion)*
 
 - [x] 01-09-PLAN.md — 前端 settings 页与 dev 冒烟页（TanStack Query 失效模式）
+
+**Gap-closure Wave 1** *(波次相对本缺口修补集重新起算，不接续上面的七波)*
+
+- [ ] 01-10-PLAN.md — 【Blocker】凭据型 base_url 在 engine 写入路径与前端两道守卫上被拒（gap 1）
+- [ ] 01-11-PLAN.md — 【Blocker】明文密钥扫描器看得见 `sk-ant-…` 形态 + selftest 自证非恒真（gap 2）
+- [ ] 01-13-PLAN.md — WebView 内容安全策略 + 关闭无消费方的资源协议（CR-02）、tracing subscriber 落地（WR-04）
+
+**Gap-closure Wave 2** *(blocked on 01-11 — 同为 prism-mcp 文件)*
+
+- [ ] 01-12-PLAN.md — prism-mcp 空 bearer 由 fail-open 改为构造期即拒 + 比较层纵深（CR-03）
 
 ### Phase 2: F1 导入与同步
 
@@ -218,7 +228,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 ∥ 5 → 6 → 7 → 8（�
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 基建骨架 | 9/9 | In Progress|  |
+| 1. 基建骨架 | 9/13 | In Progress (gap closure) |  |
 | 2. F1 导入与同步 | 0/TBD | Not started | - |
 | 3. 锚定引擎 ★ | 0/TBD | Not started | - |
 | 4. F2′ 速读区 | 0/TBD | Not started | - |
