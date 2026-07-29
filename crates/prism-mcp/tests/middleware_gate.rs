@@ -353,6 +353,73 @@ async fn bearer_layer_alone_is_what_rejects_a_bad_token() {
     assert!(body.contains(SENTINEL));
 }
 
+/// CR-03 的现实攻击形态：向一个**合法配置**的门禁发 `Authorization: Bearer `
+/// （Bearer 之后是空 token）。`strip_prefix("Bearer ")` 对它给出 `Some("")`，
+/// 因此空呈递值不会在解析阶段被挡掉，一路走到比较层——那里必须拒。
+#[tokio::test]
+async fn an_empty_presented_token_is_denied_by_the_bearer_layer_alone() {
+    const EMPTY_PRESENTED: &str = "Bearer ";
+
+    let guarded = sentinel_router().layer(from_fn_with_state(deps(), require_bearer));
+    let (status, body) = oneshot(
+        guarded,
+        request("127.0.0.1:51234", None, Some(EMPTY_PRESENTED)),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "空呈递 token 未被 require_bearer 拒绝"
+    );
+    assert!(!body.contains(SENTINEL), "请求仍到达了 handler: {body}");
+    // 拒绝形态与其余两层完全一致（T-01-29）：403 且空正文。
+    assert!(body.is_empty(), "拒绝响应带了正文: {body}");
+
+    // 反证（落点唯一）：摘掉这一层，同一请求直达 sentinel。
+    let bare = sentinel_router();
+    let (status, body) = oneshot(
+        bare,
+        request("127.0.0.1:51234", None, Some(EMPTY_PRESENTED)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.contains(SENTINEL),
+        "没挂中间件时请求也没到 handler —— 上面的 403 可能另有来源"
+    );
+
+    // 合法 token 放行。
+    let guarded = sentinel_router().layer(from_fn_with_state(deps(), require_bearer));
+    let (status, body) = oneshot(
+        guarded,
+        request("127.0.0.1:51234", None, Some(&good_auth())),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains(SENTINEL));
+}
+
+/// 纵深的另一半（CR-03）：「配置为空的门禁」这个对象在本 crate 之外根本造不出来。
+///
+/// 刻意**不经** `deps()` 助手——它带 `.expect(...)`，断言会落在 panic 上而不是返回值上。
+#[test]
+fn an_empty_configured_bearer_cannot_be_constructed_in_the_first_place() {
+    assert!(
+        McpDeps::new(Arc::new(EmptySource), Arc::new(EmptySource), "").is_err(),
+        "空配置构造出了一个门禁"
+    );
+    assert!(
+        McpDeps::new(Arc::new(EmptySource), Arc::new(EmptySource), "   ").is_err(),
+        "纯空白配置构造出了一个门禁"
+    );
+
+    // 阴性对照：守卫不是「一律拒绝构造」。
+    assert!(
+        McpDeps::new(Arc::new(EmptySource), Arc::new(EmptySource), GOOD_BEARER).is_ok(),
+        "合法配置也被拒绝构造了"
+    );
+}
+
 /// 拒绝响应体不得透露「是哪一层挂了」（T-01-29）。
 #[tokio::test]
 async fn rejections_do_not_disclose_which_layer_denied() {

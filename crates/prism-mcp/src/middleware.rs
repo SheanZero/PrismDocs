@@ -212,7 +212,10 @@ mod tests {
         ));
         assert!(!constant_time_eq(configured, ""));
         assert!(!constant_time_eq("", configured));
-        assert!(constant_time_eq("", ""));
+        // 配置为空的门禁不得放行任何人——包括呈递空 token 的人（CR-03）。
+        // 这条 case 刻意**不删**：被删掉的形态就是没人看着的形态。它曾经把
+        // fail-open 钉成预期，现在钉的是相反的结论。
+        assert!(!constant_time_eq("", ""));
     }
 
     /// 源码层面的守卫：这一层永远不能退回 `==`。
