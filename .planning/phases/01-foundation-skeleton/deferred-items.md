@@ -21,3 +21,14 @@
 - **`state add-decision` 写出的行前缀是 `[Phase ?]` 而非 `[Phase 1]`**（.planning/STATE.md 第 82–94 行）。
   自 01-02 起每个 plan 追加的决策都带这个占位符，01-01 手写的四条则是 `[Phase 1]`。
   属于 gsd-tools 侧的行为，非本仓库代码；范围外未修，留待 milestone 收尾时统一整理。
+
+## 01-18 登记
+
+- **`prism-engine/src/lib.rs` 的版本串仍是 `filter_map` 惯用法**（上轮 IN-03 点名的四处之一）。
+  01-18 只改了 `open.rs` 那一处（唯一进入准入判定路径的），01-19 覆盖 `lib.rs` 的 `parts`
+  与 `tests/concurrency.rs` 的 `version_tuple`，**`prism-engine` 那一处两个 plan 都没覆盖**。
+  它是展示用途（不参与任何准入或比较判定），按 scope boundary 未修；建议在 `/gsd-verify-work`
+  或下一轮评审时一并处理。
+- **计划文本里的 `3.x.51` 反例不具判别力**：它塌缩成 `(3,51,0)`，恰好也低于 `MIN_SQLITE=(3,51,3)`，
+  于是准入结果与正确实现一致。真正的放行口是 `3.x.53` → `(3,53,0)`。已在 01-18 的测试用例与
+  `parse_sqlite_version` 注释里更正；若后续 plan 引用了同一反例，需一并更正。

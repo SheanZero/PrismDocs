@@ -280,7 +280,12 @@ $ cargo test -p prismdocs-shell --features test    # 13 + 2 passed
 ## Next Phase Readiness
 
 - 01-19 的范围（`lib.rs` 的 `parts`、`seed.rs`、`tests/concurrency.rs`）本 plan 一字未动，可直接叠加。
-- `-wal` 里 `parse_sqlite_version` 的注释已声明另外三处同惯用法的处置归属，01-19 处理 `lib.rs` 那一处时无需再判断是否漏改。
+- `open.rs` 里 `parse_sqlite_version` 的注释已声明另外三处同惯用法的处置归属，01-19 处理 `lib.rs` 那一处时无需再判断是否漏改。
+
+## Self-Check: PASSED
+
+- `crates/prism-store/src/open.rs`、`crates/prism-store/src/error.rs`、本 SUMMARY 三个文件均存在
+- 七个提交（`59e609f` `194bd96` `1693d6a` `50c010e` `e6460ca` `f1fc3e0` `3857f98`）均在 git log 中
 
 ---
 *Phase: 01-foundation-skeleton*

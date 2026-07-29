@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-16-PLAN.md
-last_updated: "2026-07-29T12:18:12.148Z"
+stopped_at: Completed 01-18-PLAN.md
+last_updated: "2026-07-29T12:32:11.970Z"
 last_activity: 2026-07-29
-last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（唯一空值处理点 / bearer 归一化 / RFC 7235 scheme）
+last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 16
+  completed_plans: 17
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 16 of 28（01-01..01-16 已执行；下一份 01-17）
+Plan: 17 of 28（01-01..01-16 已执行；下一份 01-17）
 Status: Ready to execute
 Last activity: 2026-07-29 — 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 
-Progress: [██████░░░░] 57%
+Progress: [██████░░░░] 61%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -82,6 +82,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P14 | 25min | 3 tasks | 2 files |
 | Phase 01 P15 | ~20min | 2 tasks | 2 files |
 | Phase 01 P16 | ~35min | 3 tasks | 3 files |
+| Phase 01 P18 | 15min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,10 @@ Recent decisions affecting current work:
 - [Phase ?]: constant_time_eq 只删不可达分支不重写折叠结构：绑定两件事会让「哪一层挡住了」的反证落点不再唯一
 - [Phase ?]: 源码断言锚点定为完整语句 `if expected.is_empty() {`——反证实测证明注释里的词不足以钉住守卫，且死分支会稀释同一条断言的判别力
 - [Phase ?]: bearer 归一化分两处只做一次：配置侧在 McpDeps::new trim，呈递侧只 trim_start（尾随 OWS 归 HTTP 解析层）
+- [Phase ?]: 01-18: 新 StoreError 变体（JournalModeNotWal / CheckpointBusy）走 EngineError::Store(_) 兜底臂，不扩 IPC 短码表（沿用 01-10 决策）
+- [Phase ?]: 01-18: 畸形 SQLite 版本串复用 SqliteTooOld 而非加第三个变体——「无法证明够新」与「确实太旧」同一处置
+- [Phase ?]: 01-18: 断言落在解析结果而非下游布尔上——计划给的六条版本用例在当前 MIN_SQLITE 下恒真，真正的放行口是 3.x.53 → (3,53,0)
+- [Phase ?]: 01-18: busy 复现测试留下（计划要求删除）——否则 close() 读 busy 列的三行再无行为面保护；代价是 lib 测试从 0.03s 变 5.5s
 
 ### Pending Todos
 
@@ -190,6 +195,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T12:18:12.139Z
-Stopped at: Completed 01-16-PLAN.md
+Last session: 2026-07-29T12:32:11.961Z
+Stopped at: Completed 01-18-PLAN.md
 Resume file: None
