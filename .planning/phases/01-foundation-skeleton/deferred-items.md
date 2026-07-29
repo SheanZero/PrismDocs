@@ -3,6 +3,9 @@
 执行期发现、但落在当前 plan 范围之外的事项。**不在本 phase 修**，登记在此供后续 plan 或
 `/gsd-verify-work` 决定去留。
 
+本文件的两条候选（01-03 的 rustfmt、01-05 的 `[Phase ?]` 前缀）已于 Phase 1 收尾的 gap-closure
+轮次（plan 01-25）逐条定案，去向见各条下方的同名小节；本文件此后只承接**新**发现的范围外事项。
+
 ## 发现于 plan 01-03
 
 ### 1. workspace 未通过 `cargo fmt --check`，且 CI 无 fmt 闸门
@@ -16,11 +19,46 @@
 - 要么补一个 `cargo fmt --all -- --check` 的 CI 步骤并一次性格式化全仓，要么明确记为「不采用 rustfmt 默认风格」
 - 建议在 plan 01-09（CI 收尾）或 `/gsd-verify-work` 时一次性拍板，避免逐 plan 各自格式化造成风格拉锯
 
+#### 去向（Phase 1 收尾定案）
+
+**已排进本轮 gap-closure 的 `01-28-PLAN.md`**（wave 6，本轮最后一份），形态是一个
+`checkpoint:decision`（该 plan 的 Task 1，也是本轮唯一的 `checkpoint:decision`）：
+
+- **选项 A**：补一个 `cargo fmt --all -- --check` 的 CI 步骤（engine job 最前）并一次性格式化全仓，
+  同时创建 `rustfmt.toml`（空文件即代表显式采用 rustfmt 默认风格）与 `justfile` 的 `fmt-check` recipe。
+- **选项 B**：明确记为「本项目不采用 rustfmt 默认风格」，不加闸门；决定记录（含日期与理由）写在
+  `justfile` 文件头，仓库里不放 `rustfmt.toml`。
+
+**可逆性是 `costly` 而非 one-way**：两个方向都只是一次全仓 diff，没有已发布契约被破坏、不需要数据迁移；
+但选项 A 会产生一个触及每一个 Rust 文件的提交，且此后每个 phase 都受它约束。
+
+**为什么必须现在拍板**：逐 plan 各自格式化会造成风格拉锯，而每多一个 phase 就多一批文件——成本随时间
+单调上升。选项 A 另有一个已知风险需在执行时看住：本仓库多条 `include_str!` 源码序断言靠字符串片段定位
+（`open.rs` / `lib.rs` / `commands.rs` / `services.rs` / `middleware.rs`），rustfmt 的换行偏好可能把某个
+锚点拆到两行，使断言在实现完全正确时变红；届时修的是**锚点**，不是断言本身。
+
+`01-28-PLAN.md` 的 Task 2 会把最终结论回填到本小节。本小节只做指向，不做决策。
+（记账澄清：rustfmt 决策不在 01-27——01-27 只做 CI 闸门接线，其 objective 亦写明二选一定案在 01-28。）
+
 ## 01-05 登记
 
 - **`state add-decision` 写出的行前缀是 `[Phase ?]` 而非 `[Phase 1]`**（.planning/STATE.md 第 82–94 行）。
   自 01-02 起每个 plan 追加的决策都带这个占位符，01-01 手写的四条则是 `[Phase 1]`。
   属于 gsd-tools 侧的行为，非本仓库代码；范围外未修，留待 milestone 收尾时统一整理。
+
+#### 去向（Phase 1 收尾定案）
+
+**继续顺延。** 理由：它属于 gsd-tools 侧的行为、**不是本仓库的代码**——本轮 gap-closure 的「全部清干净」
+范围是本仓库的代码与配置，改不了的东西不能靠本轮的计划关闭（写一份 plan 去改它只会产出一份必然落空的
+计划）。
+
+**具体去处**（二者不互斥）：
+
+- milestone 收尾时统一整理 `.planning/STATE.md` 的决策前缀，把 `[Phase ?]` 批量归位为实际的 Phase 编号；
+- 或向 gsd-tools 上游反馈 `state add-decision` 未继承当前 phase 编号这一行为。
+
+**实际影响是记账可读性，不是正确性**：决策内容本身完整无损，只有 Phase 编号是占位符；任何按内容检索
+决策的用法都不受影响，受影响的只有按 Phase 分组阅读 STATE.md 的场景。
 
 ## 01-18 登记
 
