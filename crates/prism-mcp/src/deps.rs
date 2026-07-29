@@ -104,4 +104,52 @@ mod tests {
         let cloned = d.clone();
         assert_eq!(cloned.expose_bearer(), "abc");
     }
+
+    /// CR-03 的纵深第一层：一个装不出门禁的输入在构造期就被拒。
+    ///
+    /// 「配置了但配了个空白」与「根本没配」是同一件事——Phase 6 从钥匙串读 token 时，
+    /// 「读到空串」「首启时尚未写入」「调用点 `unwrap_or_default()`」三条路径都精确
+    /// 命中这个形态。纵深的第二层在 `middleware::constant_time_eq`。
+    #[test]
+    fn an_empty_bearer_is_refused_at_construction() {
+        // ① 空串：造不出来。
+        let err = McpDeps::new(Arc::new(Empty), Arc::new(Empty), "")
+            .expect_err("an empty bearer must not construct a gate");
+        assert!(
+            matches!(err, McpError::EmptyBearer),
+            "wrong error variant for an empty bearer: {err:?}"
+        );
+
+        // ② 纯空白同样是「没配」。
+        let blank = "    ";
+        let err = McpDeps::new(Arc::new(Empty), Arc::new(Empty), blank)
+            .expect_err("a whitespace-only bearer must not construct a gate");
+        assert!(
+            matches!(err, McpError::EmptyBearer),
+            "wrong error variant for a blank bearer: {err:?}"
+        );
+
+        // ③ 形态纪律：错误文本不回显被拒的值，与手写 `Debug` 的 `<redacted>` 同源
+        //    （T-01-29）。这里被拒的值恰好是空白串，所以断言的落点是「消息里没有它」。
+        let rendered = err.to_string();
+        assert!(
+            !rendered.contains(blank),
+            "the rejection echoed the value it refused: {rendered}"
+        );
+        assert!(
+            !rendered.contains('"'),
+            "the rejection quotes a value instead of stating a rule: {rendered}"
+        );
+        assert!(!rendered.is_empty(), "the rejection says nothing at all");
+
+        // ④ 阴性对照：守卫不是「一律拒绝构造」。若写成一律 Err，①②③ 也都会绿。
+        let fixture_bearer = "s3cr3t-bearer-value";
+        let ok = McpDeps::new(Arc::new(Empty), Arc::new(Empty), fixture_bearer)
+            .expect("a non-empty bearer must still construct");
+        assert_eq!(
+            ok.expose_bearer(),
+            fixture_bearer,
+            "the constructor altered a perfectly good token"
+        );
+    }
 }
