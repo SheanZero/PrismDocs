@@ -29,17 +29,28 @@ pub trait CommentSink: Send + Sync + 'static {
 /// **威胁模型 T-01-04 / T-01-20（Information Disclosure）**：这些错误会经 MCP 响应
 /// 回抛给外部 agent，因此 `Display` **不得回显调用方传入的原始参数**（project_id、
 /// 查询串、文档片段等）——否则就成了一条把内部标识与用户内容外送的隐蔽通道。
-/// `Backend` / `Invalid` 携带的必须是实现方自己写死的说明文本，不是调用参数。
+/// `Invalid` 携带的必须是实现方自己写死的说明文本，不是调用参数。
+///
+/// ## 后端失败的变体：等第一个真实调用方
+///
+/// 这里曾有一个 `Backend(String)` 变体，供存储 / 解析 / 文件系统失败之用，
+/// 但工作区里没有任何构造点——两个 `FeedbackSource` / `CommentSink` 实现与全部测试
+/// 都不构造它。一个既没人造也没人接的变体不是「预留」，是死代码：它让 `match` 多一条
+/// 永不触发的臂，也让「这层会返回哪些错误」这件事失真。这与 `prismdocs-helper doctor`
+/// 当初「给 `HelperError` 的变体一个构造点以便 `clippy -D warnings` 通过」是同一条
+/// 推理的另一半——要么给它构造点，要么不要它。
+///
+/// **重新引入的条件**：Phase 5（评论落库）或 Phase 6（评论回流）里第一个真实会失败的
+/// 调用方出现时，就地加回来。届时其文本仍须由实现方写死、不含调用参数——rusqlite /
+/// io 的原始错误串可能带路径与 SQL 片段，不能直接 `to_string()` 塞进去。
+///
+/// 本枚举是 `#[non_exhaustive]` 的，加回变体对 crate 外的 `match` 无影响。
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ServiceError {
     /// 请求的对象不存在。刻意不携带任何标识——「不存在」本身已是全部信息。
     #[error("requested resource was not found")]
     NotFound,
-
-    /// 后端（存储 / 解析 / 文件系统）失败。文本由实现方给出，不含调用参数。
-    #[error("backend failure: {0}")]
-    Backend(String),
 
     /// 请求本身不合法。文本描述**哪条规则**被违反，不回显违规的值。
     #[error("invalid request: {0}")]
