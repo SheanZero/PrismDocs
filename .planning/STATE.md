@@ -5,8 +5,8 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-07-28T23:42:20.668Z"
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-07-28T23:59:29.197Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 01 execution started
 progress:
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 6 of 9
+Plan: 7 of 9
 Status: Ready to execute
 Last activity: 2026-07-28 — Phase 01 execution started
 
@@ -63,6 +63,7 @@ Progress: [██████░░░░] 56%
 | Phase 01 P03 | 68min | 2 tasks | 8 files |
 | Phase 01 P04 | 7min | 2 tasks | 11 files |
 | Phase 01 P05 | 38min | 2 tasks | 7 files |
+| Phase 01 P06 | 26min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ Recent decisions affecting current work:
 - [Phase ?]: FTS 表在 SQL 中不能起别名：MATCH 左操作数必须是 fts5 表名，JOIN 打在 d.rowid_pk = documents_fts.rowid 上
 - [Phase ?]: LIKE 回退分支补模式语言层转义（%/_/\ + ESCAPE）：与未转义 MATCH 是同一类漏洞的两个面
 - [Phase ?]: settings 的 base_url 校验与密钥键名守卫都长在 set_setting 内部：放调用方是约定，放写入路径才是机制
+- [Phase ?]: 01-06: prism-mcp 的 bearer 在 McpDeps 中为私有字段 + pub(crate) expose_bearer，不是 pub 字段——token 的取用点在代码搜索中唯一可见
+- [Phase ?]: 01-06: 三层门禁一律返回 403 + 空正文（不给 bearer 缺失单开 401）——状态码差异本身就是逐层试探的信息源（T-01-29）
+- [Phase ?]: 01-06: rmcp SDK 侧 allowed_hosts/allowed_origins 与应用层中间件配成同一份做防御纵深；代价是端到端摘层反证失效，改由 sentinel-router 隔离测试承担
 
 ### Pending Todos
 
@@ -105,7 +109,8 @@ None yet.
 - [Phase 4 前]: Q1 速读区模型档位待 M0 评测定档
 - ~~[Phase 1]: rmcp 2.2 feature-flag 确切名称需对照 README 核验（5 分钟检查）~~ — RESOLVED (01-01)：`rmcp = { version = "2.2", features = ["server", "transport-streamable-http-server"] }` 已在 prism-mcp 中实际编译通过
 - [数据勘误]: REQUIREMENTS.md 原 Coverage 写 51 条，实际 v1 REQ-ID 为 61 条，已于 roadmap 创建时更正
-- [每个 plan 执行时]: 反证本身需要被验证（01-03 后第二次出现）：01-05 的计划反证 C 实跑不成立，暴露了 LIKE 分支缺阴性对照；触发器 DELETE 路径的验证按计划写法恒真（JOIN 掩盖了陈旧索引条目）。跑反证时要看**落点**（红在哪一条断言）而非只看红绿。
+- [每个 plan 执行时]: 反证本身需要被验证（01-03 后第三次出现）：01-05 的计划反证 C 实跑不成立，暴露了 LIKE 分支缺阴性对照；触发器 DELETE 路径的验证按计划写法恒真（JOIN 掩盖了陈旧索引条目）；01-06 的两条计划反证（从 build_router 摘掉 Host / Origin 中间件）实跑**全绿**——rmcp SDK 自带的 allowlist 替它拒掉了。跑反证时要看**落点**（红在哪一条断言）而非只看红绿；当被测层之上还有第三方兜底时，反证必须把被测层放进一个**没有兜底**的最小链路里（01-06 的 sentinel-router 隔离测试即此形态）。
+- [Phase 6 计划时]: rmcp SDK 的 Host 拒绝响应体为 "Forbidden: Host header is not allowed"，与本项目 T-01-29 的无差别拒绝口径不一致。当前应用层在外先拒使其不可达，但若 Phase 6 调整中间件顺序或 allowlist 使两者不再等价，SDK 的正文会泄漏落点
 
 ## Deferred Items
 
@@ -117,6 +122,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T23:42:11.277Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-07-28T23:59:29.191Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
