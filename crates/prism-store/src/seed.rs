@@ -48,11 +48,17 @@ fn now_secs() -> i64 {
         .unwrap_or_default()
 }
 
-/// 写入（或刷新）样例项目与样例文档，返回写入的文档条数。
+/// 写入（或刷新）样例项目与样例文档，返回**本次实际受影响的文档行数**。
+///
+/// 返回值累加自每条 `stmt.execute()`（rusqlite 交回受影响行数），而**不是**
+/// `SAMPLE_DOCS.len()`：一个与执行无关的常量报告不了它被要求报告的失败——
+/// 语句一行没写进去时它照样报「写了 3 条」（上轮 IN-02）。
+/// 项目行那条 `INSERT ... DO NOTHING` 不计入：它不是文档，且第二次播种起就返回 0。
 ///
 /// **幂等**：冒烟页上的按钮会被反复点击，两次播种必须留下一份而不是两份。
 /// 走 `ON CONFLICT DO UPDATE` 而不是先 DELETE 再 INSERT——前者触发 `documents_au`
 /// 的删增两半，FTS 索引照常跟上；后者会白白多走一遍 rowid 分配。
+/// （`DO UPDATE` 每行仍算一次受影响行，所以重复播种的返回值仍等于文档条数。）
 pub fn insert_samples(tx: &Transaction) -> Result<usize, StoreError> {
     let now = now_secs();
 
@@ -75,9 +81,10 @@ pub fn insert_samples(tx: &Transaction) -> Result<usize, StoreError> {
            content_hash = excluded.content_hash, updated_at = excluded.updated_at",
     )?;
 
+    let mut written = 0usize;
     for (id, rel_path, title, content) in SAMPLE_DOCS {
         let hash = blake3::hash(content.as_bytes()).to_hex().to_string();
-        stmt.execute((
+        written += stmt.execute((
             id,
             SAMPLE_PROJECT_ID,
             rel_path,
@@ -88,7 +95,7 @@ pub fn insert_samples(tx: &Transaction) -> Result<usize, StoreError> {
         ))?;
     }
 
-    Ok(SAMPLE_DOCS.len())
+    Ok(written)
 }
 
 #[cfg(test)]
