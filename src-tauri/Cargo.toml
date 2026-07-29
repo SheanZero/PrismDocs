@@ -27,6 +27,8 @@ prism-store = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+# 全 workspace 唯一的 subscriber 消费点（D-01）——任何 engine crate 都不加这一行。
+tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

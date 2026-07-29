@@ -6,7 +6,7 @@
 # 代码评审看不住，只有 cargo tree 断言能看住。本文件是断言的唯一实现，
 # justfile 与 .github/workflows/ci.yml 都只是调用者。
 #
-# 用法: bash scripts/check-deps.sh [dup|tauri-free|no-cycle|single-egress|all]
+# 用法: bash scripts/check-deps.sh [dup|tauri-free|no-cycle|single-egress|subscriber-free|all]
 #       无参数等同 all。失败时打印违规 crate 名并 exit 1。
 
 set -euo pipefail
@@ -161,6 +161,30 @@ check_shell_egress() {
   echo "OK: prismdocs-shell only ever reaches network/secrets through prism-engine -> prism-llm"
 }
 
+# D-01 的延伸：日志 **subscriber** 是壳的职责，engine crate 只发不装。
+#
+# 守的是什么：workspace 里 7 处 `tracing` 发射点是 engine 侧的，而安装全局 dispatcher
+# 这件事只属于 `src-tauri`。一旦 subscriber 进了任一 engine crate 的普通依赖树，
+# 「engine 可脱离壳独立测试」这条性质就开始漏——而且它**不会以编译错误的形式表现出来**：
+# 多一个依赖照常编译、照常跑测试，只是 engine 从此拖着一整套日志栈。
+#
+# 受检集合沿用 TAURI_FREE_CRATES 而不是 ENGINE_CRATES：prism-cli 将来要作为 externalBin
+# 单独签名公证，它悄悄链上一个日志栈同样是要到 Phase 6 才炸的那类问题，纳入成本为零。
+#
+# 只看 --edges normal：dev-dependencies 里出现 subscriber 是合理的（测试可以自己装一个），
+# 这条断言守的是**普通**依赖边。
+check_subscriber_free() {
+  local c out
+  for c in $TAURI_FREE_CRATES; do
+    out=$(cargo tree -p "$c" --edges normal --prefix none)
+    if grep -Eq '^tracing-subscriber( |$)' <<<"$out"; then
+      echo "FAIL: $c depends on tracing-subscriber" >&2
+      return 1
+    fi
+  done
+  echo "OK: all checked crates are tracing-subscriber-free (engine set + CLI helper)"
+}
+
 main() {
   case "${1:-all}" in
     dup)            check_dup ;;
@@ -175,6 +199,7 @@ main() {
       ;;
     facade-egress)  check_facade_egress ;;
     shell-egress)   check_shell_egress ;;
+    subscriber-free) check_subscriber_free ;;
     all)
       check_dup
       check_tauri_free
@@ -182,9 +207,10 @@ main() {
       check_single_egress
       check_facade_egress
       check_shell_egress
+      check_subscriber_free
       ;;
     *)
-      echo "usage: $0 [dup|tauri-free|no-cycle|single-egress|facade-egress|shell-egress|all]" >&2
+      echo "usage: $0 [dup|tauri-free|no-cycle|single-egress|facade-egress|shell-egress|subscriber-free|all]" >&2
       exit 2
       ;;
   esac

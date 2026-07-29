@@ -57,6 +57,11 @@ subtle = "2"
 # --- desktop shell (src-tauri only) ---
 tauri = "2"
 tauri-build = "2"
+# 日志 sink 只属于壳：engine crate 只**发**（`tracing`，上面的 shared plumbing）不**装**。
+# D-01 要求 engine 能脱离壳独立测试，subscriber 一旦进了任一 engine crate 的普通依赖树，
+# 这条性质就开始漏且不以编译错误的形式表现出来。约束由 `scripts/check-deps.sh subscriber-free`
+# 看住（已纳入 `all`），不是靠这行注释。
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # --- dev ---
 tempfile = "3"
