@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-14-PLAN.md
-last_updated: "2026-07-29T11:59:40.676Z"
+stopped_at: Completed 01-15-PLAN.md
+last_updated: "2026-07-29T12:07:28.432Z"
 last_activity: 2026-07-29
 last_activity_desc: 01-14 完成：check-secrets 关键词分支裸值可见 + scan 作用域固定
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 28
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 14 of 28（01-01..01-14 已执行；下一份 01-15）
-Status: Executing Phase 01
+Plan: 15 of 28（01-01..01-14 已执行；下一份 01-15）
+Status: Ready to execute
 Last activity: 2026-07-29 — 01-14 完成：check-secrets 关键词分支裸值可见 + scan 作用域固定
 
-Progress: [█████░░░░░] 50%
+Progress: [█████░░░░░] 54%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -80,6 +80,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P13 | 14min | 3 tasks | 7 files |
 | Phase 01 P12 | 6min | 2 tasks | 6 files |
 | Phase 01 P14 | 25min | 3 tasks | 2 files |
+| Phase 01 P15 | ~20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -150,6 +151,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-14: scan 的 cwd 固定（防线）与扫描面下限断言（报警器）成对存在——单有防线时它被删掉仍表现为绿，下限让作用域收窄从 OK/exit 0 变成 FAIL/exit 1
 - [Phase ?]: 01-14: 检测控件每次扩宽都必须配一条只能经新分支命中的样本——否则旧分支替新分支兜底，selftest 从「不完整」变成「有误导性」（CR-01 的形态）
 - [Phase ?]: 01-14: INFRA-03 仍不勾——证据侧（扫描器现在看得见裸值配置形态）与写入侧（01-10）两半均已关闭，但需求文本的「支持 Anthropic/OpenAI 兼容端点」半句要到 Phase 4 才有 chat client（沿用 01-09/01-10/01-11 同一判据）
+- [Phase ?]: check_dup 的 FAIL 消息拆两行：退出码 + 明说「这不是发现了重复，是断言本身没跑起来」——两件事在退出码上不可区分，只能靠文案分
+- [Phase ?]: 01-15: no-cycle 侧裸前缀实测方向与 REVIEW IN-04 散文相反（过敏而非逃逸），仍做尾随空格锚定但源码注释写实测方向，并写明将来 facade 层新 crate 必须显式加进 check_no_cycle
 
 ### Pending Todos
 
@@ -183,6 +186,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T11:59:12.172Z
-Stopped at: Completed 01-14-PLAN.md
+Last session: 2026-07-29T12:07:28.423Z
+Stopped at: Completed 01-15-PLAN.md
 Resume file: None
