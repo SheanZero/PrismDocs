@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 13
+open_count: 14
 waived_count: 0
 fixed_count: 1
-total_count: 14
-last_updated: 2026-07-29T23:39:44.371Z
+total_count: 15
+last_updated: 2026-07-30T00:06:08.390Z
 ---
 
 # Broken Windows Ledger
@@ -29,6 +29,7 @@ last_updated: 2026-07-29T23:39:44.371Z
 | 12 | 01 | deviation | crates/prism-engine/src/services.rs |  | Engine::list_feedback 的空 project_id 校验无端到端哨兵：01-17 在 PrismHandler 加的 projectId 校验集合覆盖了它（同为 trim().is_empty()），MCP 线上不存在能引出 engine 校验文本的输入；判别性已搬到 facade.rs 对 Arc<dyn FeedbackSource> 的直接调用 | open |  | 2026-07-29T14:00:06.507Z |  |
 | 13 | 01 | deviation | .planning/phases/01-foundation-skeleton/01-REVIEW.md |  | 01-REVIEW.md WR-03 第 2 点举的可达性例子 Host: 127.0.0.1:notanumber 实测不成立（http 1.x 的 Authority::try_from 接受非数字端口）；真正分叉的是 127.0.0.1:80/evil 与 127.0.0.1:80@evil.com，已在 01-17 更正并落测 | open |  | 2026-07-29T14:00:06.558Z |  |
 | 14 | 01 | unrun-verify | .github/workflows/ci.yml |  | 本 plan 加的三项 workflow 级配置（permissions: contents: read 下 upload-artifact 是否仍可上传、concurrency 是否真的收掉同 commit 的双跑、两个缓存分段是否互不恢复）只有 YAML 可解析 + 推理这一层证据：gh run list 返回 []、origin/main 停在 4cc1347，该 workflow 至今未在 GitHub Actions 上跑过。步骤级断言已全部本机实证 | open |  | 2026-07-29T23:39:44.371Z |  |
+| 15 | 01 | unrun-verify | .github/workflows/ci.yml |  | 01-28 新增的 fmt 闸门（engine job 首步 cargo fmt --all -- --check）只有本机证据：--check 退出 0、注入劣化排版后退出 1 并点名文件、YAML 可解析且步骤顺序正确。「CI 上这一步真的会红」未观测——该 workflow 至今未在 GitHub Actions 上跑过（与 id=14 同一次真实运行可一并核对） | open |  | 2026-07-30T00:06:08.390Z |  |
 
 ````json
 [
@@ -198,6 +199,18 @@ last_updated: 2026-07-29T23:39:44.371Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-29T23:39:44.371Z",
+    "resolved_at": null
+  },
+  {
+    "id": 15,
+    "kind": "unrun-verify",
+    "phase": "01",
+    "file": ".github/workflows/ci.yml",
+    "line": null,
+    "description": "01-28 新增的 fmt 闸门（engine job 首步 cargo fmt --all -- --check）只有本机证据：--check 退出 0、注入劣化排版后退出 1 并点名文件、YAML 可解析且步骤顺序正确。「CI 上这一步真的会红」未观测——该 workflow 至今未在 GitHub Actions 上跑过（与 id=14 同一次真实运行可一并核对）",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-30T00:06:08.390Z",
     "resolved_at": null
   }
 ]

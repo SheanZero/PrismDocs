@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: foundation-skeleton
 status: executing
-stopped_at: Completed 01-27-PLAN.md（CI 闸门收口；rustfmt 决策留给 01-28）
-last_updated: "2026-07-29T23:40:03.410Z"
+stopped_at: Completed 01-28-PLAN.md
+last_updated: "2026-07-30T00:05:59.135Z"
 last_activity: 2026-07-29
 last_activity_desc: 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 28
-  completed_plans: 27
+  completed_plans: 28
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 01 (foundation-skeleton) — EXECUTING
-Plan: 27 of 28（01-01..01-16 已执行；下一份 01-17）
+Plan: 28 of 28（01-01..01-16 已执行；下一份 01-17）
 Status: Ready to execute
 Last activity: 2026-07-29 — 01-16 完成：prism-mcp 门禁层三条缺口关闭（WR-05/06/07）
 
-Progress: [██████████] 96%
+Progress: [██████████] 100%
 
 **为什么 Phase 1 尚未 Complete：** ~~`01-VERIFICATION.md` 记 3/4 成功标准通过。唯一 blocker 是成功标准 4
 的自动化证据链——`scripts/check-secrets.sh` 的关键词分支要求值带引号，未加引号的赋值（.env / YAML /
@@ -93,6 +93,7 @@ TOML / CI `env:`）整类不可见~~ — **01-14 已关闭**：关键词分支�
 | Phase 01 P19 | 8m | 3 tasks | 3 files |
 | Phase 01 P26 | 18min | 2 tasks | 7 files |
 | Phase 01 P27 | 76min | 3 tasks | 5 files |
+| Phase 01 P28 | 40m | 2 tasks | 27 files |
 
 ## Accumulated Context
 
@@ -204,6 +205,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 1] coverage 范围 = 八个 engine crate（不含 prismdocs-shell / prism-cli），新基线 93.30% region / 94.19% line；Phase 2 硬闸门以此为基线。85.48%→93.30% 的差异中 85.48%→88.59% 来自本轮补的测试、88.59%→93.30% 来自范围收窄
 - [Phase ?]: [Phase 1] coverage 步骤必须前置 cargo llvm-cov clean --workspace：report 汇总 target/ 里找到的全部对象而非本次 --no-report 点名的那些，而 CI 缓存 ./target——只改 -p 不足以让「范围 == 标题」成立（实测 src-tauri 以 0.00% 混入 TOTAL）
 - [Phase ?]: [Phase 1] concurrency group 用 github.head_ref || github.ref_name：github.ref 在 push（refs/heads/X）与 pull_request（refs/pull/N/merge）上永不相等，用它分组消不掉同仓库 PR 的双跑
+- [Phase ?]: rustfmt 取向定案 option-a：显式采用默认风格，rustfmt.toml 空文件即决定，CI engine job 首步加 cargo fmt --all -- --check
+- [Phase ?]: CI 的 rust-toolchain components 显式列出 rustfmt，不依赖 stable 默认 profile——默认值变化时的失败形态与真正的格式失败方向相反
+- [Phase ?]: deferred-items.md 采用加法式作废（删除计数 0）：过期指向句保留原文，由新小节首行就地声明其失效
 
 ### Pending Todos
 
@@ -238,6 +242,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T23:40:03.402Z
-Stopped at: Completed 01-27-PLAN.md（CI 闸门收口；rustfmt 决策留给 01-28）
+Last session: 2026-07-30T00:05:59.127Z
+Stopped at: Completed 01-28-PLAN.md
 Resume file: None
