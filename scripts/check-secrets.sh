@@ -98,7 +98,21 @@ BARE="[A-Za-z0-9_./+~-]"
 #                是成功标准 4 的密钥面。要改就得连同「裸值下界严格高于引号下界」一起重新论证，
 #                不要顺手把 16 调下去：取值为表达式的赋值（形如 `self.inner.value`）长度就在
 #                12–20 之间，下界一降它们就整片涌进来。
-PATTERN="sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{16,}|AIza[A-Za-z0-9_-]{30,}|(api[_-]?key|secret|token|password)[[:space:]]*[=:][[:space:]]*(${QUOTE}${NOT_QUOTE}{8,}|${BARE}{16,})"
+#                **HTTP 头形态（`bearer` 分支）**：01-REVIEW.md 第三轮 WR-04 / SECURITY
+#                审计 T-01-03a 记录的 OPEN——威胁陈述里有两个名词（「明文 API key
+#                **/ bearer token**」），而在本分支加入之前 PATTERN 只覆盖前一个。
+#                `Authorization: Bearer <32 hex>` 的三种现实提交写法当时全部不命中，
+#                而那恰好是 D-07 的 `prismdocs-helper headers` 子命令的**输出形态**。
+#
+#                上面阳性组里那条 `Authorization: "Bearer sk-ant-api03-…"` 读起来像
+#                已经覆盖了这一形态，实际是经 `sk-` 前缀分支命中的——它对本分支零判别力。
+#                所以本分支配了三条隔离样本（见 selftest 同名小节），值里不含任何供应商
+#                前缀、也不含关键词赋值结构，只可能经这里命中。
+#
+#                下界取 20：bearer token 是机器生成的高熵串（本项目的 mcp_bearer_token
+#                是 32 位十六进制），20 已经把它稳稳圈住，同时避开 `Bearer <short-word>`
+#                这类散文。字符集取 RFC 6750 的 b64token 语法（`[A-Za-z0-9._~+/-]`）。
+PATTERN="sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{16,}|AIza[A-Za-z0-9_-]{30,}|bearer[[:space:]]+[A-Za-z0-9._~+/-]{20,}|(api[_-]?key|secret|token|password)[[:space:]]*[=:][[:space:]]*(${QUOTE}${NOT_QUOTE}{8,}|${BARE}{16,})"
 
 # 对受版本控制的文件跑一遍正则。
 scan() {
@@ -148,6 +162,11 @@ selftest() {
   local sk="sk" dash="-" ghp="ghp" us="_" aws="AKI" q='"'
   local gh="github" pat="pat" xox="xox" aiz="AIza"
   local tok="TOKEN" pw="pass" word="word"
+  # `bear` 与 `hex32` 分开写的理由与上面几个前缀变量相同：本脚本自身在扫描面里
+  # （排除集只有 .planning/），三条 bearer 样本若写成完整字面量，scan 会当场命中自己。
+  # 小写形态单列一个变量，不用 `${bear,,}`：那是 bash 4 的语法，
+  # 而 macOS 自带的是 bash 3.2，本机会直接 bad substitution。
+  local bear="Bear" lbear="bear" hex32="7f3a9c1e5b2d8f4a6c0e9b7d3f1a5c8e"
   local positive=() negative=() s failed=0
 
   # ——阳性组前五条：01-VERIFICATION.md § SC-4 的 5 行取样，旧正则只命中最后一条。
@@ -186,6 +205,20 @@ selftest() {
   positive+=("MCP_BEARER_${tok}=7f3a9c1e5b2d8f4a6c0e9b7d3f1a5c8e")
   positive+=("${pw}${word}: abcdefghijklmnop")
 
+  # ——阳性组：隔离 bearer 分支（见 PATTERN 定义处同名小节）。
+  #   这三条是 D-07 的 `prismdocs-helper headers` 输出落进提交时的现实写法。
+  #   值是 32 位十六进制，不含任何供应商前缀；行内也没有
+  #   api_key/secret/token/password 后跟 `=`/`:` 的结构（`Authorization` 不在关键词表里）。
+  #   因此它们**只可能**经 bearer 分支命中：把该分支从 PATTERN 里删掉，
+  #   红的必须恰好是这三条，其余 22 条阳性样本一条都不受影响。
+  #
+  #   注意上面 sk- 组里那条 `Authorization: "Bearer sk-ant-api03-…"`：它读起来像已经
+  #   覆盖了 HTTP 头形态，实际是经 sk- 前缀分支命中的，对本分支零判别力。
+  #   这正是 01-REVIEW.md 第三轮 WR-04 指出的误导形状——控件看着有，实际没有。
+  positive+=("Authorization: ${bear}er ${hex32}")
+  positive+=("${q}Authorization${q}: ${q}${bear}er ${hex32}${q}")
+  positive+=("headers.insert(${q}Authorization${q}, ${q}${bear}er ${hex32}${q});")
+
   # ——阴性组前两条：既有 fixture，扫描器不得为了迁就它们而放宽（反之亦然）。
   negative+=("const FIXTURE_SECRET: &str = \"prism-test-secret-value\";")
   negative+=("const FAKE_KEY = \"fixture-not-a-real-credential\";")
@@ -207,6 +240,15 @@ selftest() {
   negative+=("token = abcdefghijklmno")
   negative+=("let token = someVar;")
   negative+=("secret: cfg.value")
+
+  # ——阴性组：bearer 分支的成对边界与散文对照。
+  #   第一条值 19 个字符，比下界 20 少一个，与上面那三条 32 位阳性样本构成边界对：
+  #   把下界从 20 降到 8，它当场变红。
+  #   后两条是把该分支的字符集或下界放宽后会立刻涌进来的东西——讲 bearer 认证的
+  #   散文与代码标识符。控件要能区分「一个 token 落进提交」与「有人在谈论 token」。
+  negative+=("Authorization: ${bear}er abcdefghijklmnopqrs")
+  negative+=("// 该端点要求 ${bear}er 认证，token 只存钥匙串")
+  negative+=("let ${lbear}er_header = build_auth_header(cfg);")
 
   # 逐条喂样本一律用 herestring，**不得用管道**：pipefail 下 `grep -q` 命中即早退，
   # 写端拿到 SIGPIPE 后管道整体的退出码会掩盖判定结果，断言静默恒绿。

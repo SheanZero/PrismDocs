@@ -200,6 +200,8 @@ npm install -D vite@8 @vitejs/plugin-react @tauri-apps/cli@2 typescript vitest
 | typescript-eslint | npm | 最新稳定 8.65.0（2026-07-20） | 84.5M/wk | typescript-eslint/typescript-eslint | OK | Approved — 人工确认于 01-26 执行期（2026-07-29） |
 | eslint-plugin-react-hooks | npm | 最新稳定 7.1.1（2026-04-17） | 93.6M/wk | facebook/react | OK | Approved — 人工确认于 01-26 执行期（2026-07-29） |
 | globals | npm | 最新稳定 17.8.0（2026-07-26） | 262.0M/wk | sindresorhus/globals | OK | Approved — 人工确认于 01-26 执行期（2026-07-29） |
+| @emnapi/core | npm | **2.0.0-alpha.3**（2026-07-18，`alpha` tag；`latest` 是 1.11.3） | 71.9M/wk | toyobayashi/emnapi | OK | **事后补录**，见下 |
+| @emnapi/runtime | npm | **2.0.0-alpha.3**（2026-07-18，`alpha` tag；`latest` 是 1.11.3） | 93.2M/wk | toyobayashi/emnapi | OK | **事后补录**，见下 |
 
 **关于 `tracing-subscriber` 的补录说明:** 本表建于 phase 规划期，早于 gap-closure plan 01-13。
 01-13 Task 2 是一个 `gate="blocking-human"` 的包合法性闸门——未经审计的包一律按 `[ASSUMED]` 处理，
@@ -234,6 +236,42 @@ owner）、首发 2019-06-27、累计 ~523M 次下载（90 天 ~128M）、最高
 人工**明确拒绝了 6.x、选择 7.x**，并接受这份更重的依赖树作为已知成本。本 plan 因此 pin
 `^7.1.1`。实装版本：eslint 10.8.0 / typescript-eslint 8.65.0 / eslint-plugin-react-hooks 7.1.1
 / globals 17.8.0，`npm ls` 显示 eslint 在树中 deduped 为单一副本。
+
+**关于 `@emnapi/core` / `@emnapi/runtime` 的事后补录说明:**
+
+⚠️ **这两条与上面所有条目不同：它们没有走 `gate="blocking-human"` 闸门。** 由 orchestrator 在
+Phase 01 收尾的 security audit 阶段补录（2026-07-30），触发者是 auditor 报出的 **UF-1**
+（Unregistered Flag：新增依赖落在所有 plan 的 `<threat_model>` 之外，且无审计行）。补录不等于
+过闸门——记在这里是为了让下一轮审计看得见它，不是为了让它变成「已批准」。
+
+**它们怎么进来的**：不是任何 plan 主动引入的。Phase 01 全部 28 份 plan 执行完毕、CI 首次真实
+运行（run 30508455439）时 frontend job 红在 `npm ci`（EUSAGE），修复提交 `a95043b` 用
+`npx npm@11.19.0 install --package-lock-only` 重生锁文件，这两条随之被 npm 写入。
+
+**为什么锁文件需要它们**：`@napi-rs/wasm-runtime@1.2.0`（rolldown / vite 8 的 wasm32-wasi
+回退绑定，本身是 `optional: true, dev: true`）声明
+`peerDependencies: { "@emnapi/core": "^2.0.0-alpha.3", "@emnapi/runtime": "^2.0.0-alpha.3" }`。
+npm 11.6.2 不给「本平台用不上的 optional 包」解析 peer，11.19 会解析——版本线差异，非人为选择。
+**alpha 版本不是我们挑的，是那条 peer range 只允许 `^2.0.0-alpha.3`。**
+
+**核对结果（2026-07-30，直查 registry.npmjs.org + api.npmjs.org）**：
+
+- 两包同源 `git+https://github.com/toyobayashi/emnapi.git`，即 emnapi 官方仓库；首发 2023-02-14
+- 许可均为 MIT；均未被 yank 或 deprecate
+- **install/postinstall 脚本：两者皆无**（`hasInstallScript: false`；`scripts` 里只有
+  `build` / `test`，registry tarball 安装不跑它们）
+- 周下载量 71.9M / 93.2M —— 与它们作为 napi-rs 生态基础件的地位相符
+- `dist.integrity` 已向官方源逐条核对，**均 MATCH**（记录在 `a95043b` 提交信息里）
+
+**实际风险面（这是本条最要紧的事实）**：两包在锁文件里的标记是
+`dev: true, optional: true, peer: true`，且 `node_modules/@emnapi/` 在本机**整个目录不存在**
+——它们是一个「本平台用不上的 optional 包」的 peer，在有原生绑定的平台上从不被安装。
+**锁文件里有记录，但没有任何代码被执行。**
+
+**未解决的部分**：`2.0.0-alpha.3` 是 pre-release（`alpha` tag，`latest` 为 1.11.3）。
+只要 vite/rolldown 的 wasm 回退链保持现状，它就会一直留在锁文件里。若将来某个 CI runner
+或开发者的平台没有原生 rolldown 绑定，这两个 alpha 包**会被真正安装并执行**——届时必须
+补一次正式的 blocking-human 审计。
 
 **Packages removed due to [SLOP] verdict:** none
 

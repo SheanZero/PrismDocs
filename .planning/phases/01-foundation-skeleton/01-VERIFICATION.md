@@ -1,7 +1,7 @@
 ---
 phase: 01-foundation-skeleton
 verified: 2026-07-30T00:34:27Z
-status: human_needed
+status: passed
 score: 3/4 must-haves verified
 behavior_unverified: 1
 overrides_applied: 0
@@ -10,12 +10,15 @@ re_verification:
   previous_score: 3/4
   previous_verified: 2026-07-29T06:10:04Z
   gaps_closed:
+
     - "上轮唯一 gap：`check-secrets.sh` 关键词分支要求值带引号，未加引号的赋值整类不可见。verifier 独立复现上轮那次注入实验（往 `.github/workflows/ci.yml` 追加两行裸值密钥）—— 上轮 scan 退出 0，本轮 **退出 1 并点名两行**。上轮 8 行取样表现在 7/8 命中（第 8 行 `password = hunter2hunter2` 值仅 14 字符，落在裸值下界 16 之下，脚本第 94-100 行把它写成有理由的已知残留）"
   gaps_remaining: []
   regressions: []
   label_changes:
+
     - "成功标准 2 由上轮的「✓ VERIFIED（有告警）」改判为「⚠️ PRESENT_BEHAVIOR_UNVERIFIED」。**证据状态未变**（上轮同样记录了真实 WebView 证据因 01-13 加 CSP 而过期），改的是标签口径：一条断言真实 WebView 往返的行为型 truth，在其唯一端到端证据失效时不应计入 verified 分子。这不是回退，是把上轮已写在正文里的告警提到状态位上"
   warnings_closed_this_round:
+
     - "`concurrency.rs` 的恒真断言 `assert!(after >= 1)` → 现为 `assert_eq!(after, 2)`（01-19）"
     - "SQLite 版本下界无断言 → `MIN_SQLITE=(3,51,3)` 现由 `open.rs:125-127` 在准入路径上强制（01-18/01-19）"
     - "`check-deps.sh` 的 `cargo tree … || true` 吞掉调用失败 → 现先接住退出码再判输出（01-15）"
@@ -23,22 +26,28 @@ re_verification:
     - "前端无 lint 闸门 → ESLint flat config + `npm run lint` 接进 CI（01-26/01-27）"
     - "无 fmt 闸门 → `rustfmt.toml` + CI engine job 首步 `cargo fmt --all -- --check`（01-28）"
     - "INFRA-03 映射孤儿风险 → 已改映射 Phase 4 并加四点表下注（01-25）"
+
 deferred:
+
   - truth: "INFRA-03 的「支持 Anthropic/OpenAI 兼容端点」分句（真正向端点发出请求）"
     addressed_in: "Phase 4"
     evidence: "`.planning/REQUIREMENTS.md:170` 已把 INFRA-03 映射到 Phase 4，表下注第 3 点写明依据是 ROADMAP Phase 4 goal「A3：prism-llm 传输层（流式/重试/keyring）先行交付」。本轮已核：这条不再是 Phase 1 的未闭合项，而是已完成记账迁移的跨切需求"
 behavior_unverified_items:
+
   - truth: "成功标准 2：一条总线事件经粗粒度 Tauri event 往返前端（notify-then-fetch），一条命令经 Channel 有序流式返回"
     test: "真实 WebView 下跑 dev 冒烟页的两个入口：① 点「发一条总线事件」，事件计数与点击次数 1:1（离开页面再回来再点，不翻倍）；② 点「Channel 有序流」，读数为「seq 校验通过 · 实收 1000 条」"
     expected: "两个读数都与 01-09 那次人工验证一致。若 IPC 被 CSP 的 `connect-src 'self' ipc: http://ipc.localhost` 挡住，受影响的不是某一个命令而是全部十个——两条通路会同时断"
     why_human: "两条通路的自动化层都结构性看不见真实往返：`cargo test` 走 `mock_builder`（无 WebView），vitest 走 jsdom 且 `@tauri-apps/api/event` 被 mock。`src-tauri/tests/ipc.rs:126-131` 对 `dev_smoke_stream` 只断言 `res.is_ok()`，不校验 1000 条的到达与顺序；顺序断言在 `smoke.rs` 的**生成器**单测里，不覆盖 Channel 传输。唯一的端到端证据取自 01-09，那时 `csp` 还是 `null`——环境已变更，旧读数不得沿用"
 human_verification:
+
   - test: "真实 WebView 下的 CSP 与 IPC 双通路（同时承载成功标准 2 的复验）。六步：① `npm run tauri dev` 起应用，窗口不是白屏；② 设置页可用，保存一个合法端点（如 `https://api.anthropic.com`）出现成功文案；③ dev 冒烟页跑三个入口（总线事件 1:1 计数 / Channel「seq 校验通过 · 实收 1000 条」/ 中文搜索「锚定引擎」>0 且「量子纠缠」=0）；④ WebView 控制台无任何 CSP 违规报告，特别留意 01-24 新加的 `form-action 'none'` 与 `frame-ancestors 'none'`；⑤ `npm run tauri build` 出 dmg，安装后对 ①–④ 重复一遍（发布形态走 `csp` 而非 `devCsp`，这是验证严格那一份的唯一路径）；⑥ 发布形态额外确认冒烟页开关不存在且四个 `dev_*` 命令不可调用"
     expected: "六步全部正常，三个入口读数与 01-09 一致。第 ④ 步的两条新指令预期不触发：Phase 1 前端不含原生 `<form>` 提交，桌面窗口也不会被嵌套"
     why_human: "CSP 只在真实 WebView 里生效——`src/lib/tauri-security.test.ts:17` 自己写明 jsdom 看不见它，`cargo test` 走 `mock_builder` 也无 WebView。出现违规时的处理：只放宽 `devCsp`，或按控制台点名的指令逐项追加到 `csp`；**禁止**把 `csp` 设回 `null`，也禁止直接删掉 01-24 新加的两条指令——若确需放宽，先在 `tauri-security.test.ts` 的精确相等断言上过一次评审（WINDOWS id=8）"
+
   - test: "日志 sink 真的有落点。两步：① 默认档位（不设 `RUST_LOG`）`npm run tauri dev`，在设置页把 base_url 设成一个非 loopback 的 `http://` 端点（如 `http://example.com/v1`）并保存，观察终端；② `RUST_LOG=trace npm run tauri dev`，观察终端"
     expected: "① 出现 tracing 格式的行，且 `crates/prism-store/src/settings.rs:88-91` 那条 `LLM endpoint uses plaintext http to a non-loopback host` 实际打出来（默认 info 档下就有落点，无需提档）；② 出现 01-21 的降档 warn，正文以 `the environment-supplied log filter exceeds the project ceiling` 开头并说明 `rmcp` 被 capped at INFO，且正文中**不含** `RUST_LOG` 的原值"
     why_human: "`tracing::dispatcher::has_been_set()` 只证明 dispatcher 就位，不证明日志到达终端（EnvFilter 档位与 fmt 层的输出目标都可能让它落空）。三条安全决策日志是否真有落点取决于这条端到端确认。步骤在 01-21 之后必须走默认档位：该 plan 给 env filter 加了项目天花板（`src-tauri/src/lib.rs:51` `LOG_CEILING_DIRECTIVE = \"rmcp=info\"`），原先「用 `RUST_LOG` 提档观察」既观察不到目标、也不再是 sink 有落点的证据（WINDOWS id=9）"
+
   - test: "CI workflow 的首次真实 GitHub Actions 运行。推分支后核对：① engine job 首步 `Format check (rustfmt default style)` 出现在步骤列表最前且为绿；② `permissions: contents: read` 下 `upload-artifact` 仍可上传；③ `concurrency` 真的收掉同 commit 的双跑；④ 两个缓存分段互不恢复"
     expected: "四项全部成立。判别力可在一个丢弃分支上注入劣化排版验证 fmt 步骤会变红并点名文件"
     why_human: "`origin/main` 停在 `4cc1347`，Phase 1 全部 28 份 plan 的产物均未推送，`gh run list` 返回 `[]`——该 workflow 至今未在 GitHub Actions 上跑过。所有 CI 闸门声称在本 phase 里都只有本机证据（WINDOWS id=14 / id=15，同一次运行可一并核对）"
