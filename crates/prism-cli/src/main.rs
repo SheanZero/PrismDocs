@@ -102,7 +102,10 @@ mod tests {
     fn an_unknown_subcommand_is_an_error_that_still_shows_usage() {
         let err = run(&argv(&["nope"])).expect_err("should reject");
         let msg = err.to_string();
-        assert!(msg.contains("unknown subcommand `nope`"), "unexpected: {msg}");
+        assert!(
+            msg.contains("unknown subcommand `nope`"),
+            "unexpected: {msg}"
+        );
         assert!(msg.contains("SUBCOMMANDS:"), "unexpected: {msg}");
     }
 

@@ -41,7 +41,10 @@ mod tests {
     #[test]
     fn feedback_source_can_be_used_behind_arc_dyn() {
         let source: Arc<dyn FeedbackSource> = Arc::new(FakeSource);
-        assert!(source.list_feedback("any").expect("fake never fails").is_empty());
+        assert!(source
+            .list_feedback("any")
+            .expect("fake never fails")
+            .is_empty());
     }
 
     #[test]

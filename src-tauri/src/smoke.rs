@@ -55,10 +55,7 @@ fn clamp_total(total: u32) -> u32 {
 /// `sink` 的错误立即中止并原样返回——Channel 已关闭时继续 send 只是白白刷日志。
 /// `total = 0` 是合法输入，产出 `[Started, Finished]` 两条，返回 `Ok`：
 /// 空输入的正确语义是成功，不是错误、更不是挂起。
-pub fn generate<E>(
-    total: u32,
-    mut sink: impl FnMut(SmokeEvent) -> Result<(), E>,
-) -> Result<(), E> {
+pub fn generate<E>(total: u32, mut sink: impl FnMut(SmokeEvent) -> Result<(), E>) -> Result<(), E> {
     let total = clamp_total(total);
     sink(SmokeEvent::Started { total })?;
     for seq in 0..total {

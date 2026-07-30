@@ -112,7 +112,9 @@ fn host_of(authority: &str) -> Option<String> {
 
 /// 逐字照抄 rmcp 2.2 `tower.rs:270-274` 的 `normalize_host`，用于上面的一致性比较。
 fn sdk_normalize_host(host: &str) -> String {
-    host.trim_matches('[').trim_matches(']').to_ascii_lowercase()
+    host.trim_matches('[')
+        .trim_matches(']')
+        .to_ascii_lowercase()
 }
 
 /// 拆 Origin 为 (scheme, host)，端口丢弃。形如 `scheme://host[:port]`，不接受路径。
@@ -190,11 +192,7 @@ pub async fn require_origin_allowlist(request: Request, next: Next) -> Response 
 ///
 /// 三条 `deny` 的原因串都是编译期常量、只进本地 tracing；响应仍一律 403 + 空正文，
 /// 本层不引入任何可观测的差异化（T-01-29）。
-pub async fn require_bearer(
-    State(deps): State<McpDeps>,
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn require_bearer(State(deps): State<McpDeps>, request: Request, next: Next) -> Response {
     let Some(raw) = request.headers().get(header::AUTHORIZATION) else {
         return deny("missing Authorization header");
     };
@@ -272,7 +270,10 @@ mod tests {
         // `port_u16()` 给 None、host 仍是 `127.0.0.1`），两侧一致 → 放行。
         // 01-REVIEW.md WR-03 把它当作「过本层、被 SDK 以 400 拒掉」的例子，实测不成立；
         // 真正可达的两个形态见下面 `host_of_agrees_with_the_sdk_parser_or_denies`。
-        assert_eq!(host_of("127.0.0.1:notanumber").as_deref(), Some("127.0.0.1"));
+        assert_eq!(
+            host_of("127.0.0.1:notanumber").as_deref(),
+            Some("127.0.0.1")
+        );
         assert_eq!(host_of("127.0.0.1:").as_deref(), Some("127.0.0.1"));
         // 两侧口径分叉的两个实测形态，现在一律在本层拒：
         assert_eq!(host_of("127.0.0.1:80/evil"), None); // SDK 侧解析失败 → 400 + 正文

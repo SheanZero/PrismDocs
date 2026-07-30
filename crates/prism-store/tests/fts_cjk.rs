@@ -69,7 +69,11 @@ fn chinese_query_returns_nonzero_rows() {
 
     // ⑤b **回退分支自己的**阴性对照。⑤ 是 4 字词，走的是 MATCH——把 LIKE 分支写成
     //     无条件返回全部行，⑤ 照样绿。两条分支各要一条阴性对照，缺一条就有半边恒真。
-    assert_eq!(n(&store, "p1", "量子"), 0, "回退分支上不存在的词也应返回 0 行");
+    assert_eq!(
+        n(&store, "p1", "量子"),
+        0,
+        "回退分支上不存在的词也应返回 0 行"
+    );
 
     // ⑥ FTS5 查询语法层的注入：`"` 与布尔算子在 MATCH 串里有特殊含义，
     //    参数绑定只挡 SQL 层挡不住这层。未转义时这里会是 `fts5: syntax error`（Err）而非 0 行。
@@ -121,7 +125,10 @@ fn fts_index_follows_update_and_delete() {
     // 实测：阉割 documents_ad 后只有下面这条变红，上面那条依然绿。
     store
         .write(|tx| {
-            tx.execute(INSERT_DOC, ("d2", "p1", "b.md", "另一篇", "这篇只谈别的主题。"))?;
+            tx.execute(
+                INSERT_DOC,
+                ("d2", "p1", "b.md", "另一篇", "这篇只谈别的主题。"),
+            )?;
             Ok(())
         })
         .expect("insert after delete");
@@ -146,9 +153,18 @@ fn search_survives_vacuum() {
     store
         .write(|tx| {
             tx.execute(INSERT_PROJECT, ["p1"])?;
-            tx.execute(INSERT_DOC, ("d1", "p1", "a.md", "第一篇", "只有第一篇谈甲方案。"))?;
-            tx.execute(INSERT_DOC, ("d2", "p1", "b.md", "第二篇", "只有第二篇谈乙方案。"))?;
-            tx.execute(INSERT_DOC, ("d3", "p1", "c.md", "第三篇", "只有第三篇谈丙方案。"))?;
+            tx.execute(
+                INSERT_DOC,
+                ("d1", "p1", "a.md", "第一篇", "只有第一篇谈甲方案。"),
+            )?;
+            tx.execute(
+                INSERT_DOC,
+                ("d2", "p1", "b.md", "第二篇", "只有第二篇谈乙方案。"),
+            )?;
+            tx.execute(
+                INSERT_DOC,
+                ("d3", "p1", "c.md", "第三篇", "只有第三篇谈丙方案。"),
+            )?;
             tx.execute("DELETE FROM documents WHERE id = 'd2'", [])?;
             Ok(())
         })
@@ -200,5 +216,9 @@ fn search_is_scoped_to_project() {
     assert_eq!(short.len(), 1, "LIKE 分支应只返回本 project 的一行");
     assert_eq!(short[0].doc_id, "d1");
 
-    assert_eq!(n(&store, "p2", "锚定引擎"), 1, "另一 project 自查应仍能命中");
+    assert_eq!(
+        n(&store, "p2", "锚定引擎"),
+        1,
+        "另一 project 自查应仍能命中"
+    );
 }

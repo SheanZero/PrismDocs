@@ -53,7 +53,11 @@ mod tests {
     #[test]
     fn open_creates_missing_parent_directories() {
         let dir = tempfile::TempDir::new().expect("tempdir");
-        let db_path = dir.path().join("nested").join("deeper").join("prismdocs.db");
+        let db_path = dir
+            .path()
+            .join("nested")
+            .join("deeper")
+            .join("prismdocs.db");
         let store = Store::open(&db_path).expect("open store");
         assert!(db_path.exists(), "db file should have been created");
         drop(store);

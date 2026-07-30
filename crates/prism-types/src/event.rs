@@ -11,7 +11,11 @@ use serde::{Deserialize, Serialize};
 /// 序列化形态是跨 IPC 边界的契约：内部标签字段名为 `kind`，变体名与字段名
 /// 统一 camelCase，与前端 TypeScript 的判别联合一一对应。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum EngineEvent {
     /// 某个文档的内容或元数据发生变化。
     DocChanged { project_id: String, doc_id: String },

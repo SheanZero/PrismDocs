@@ -1,0 +1,20 @@
+# PrismDocs — rustfmt 配置
+#
+# **本文件刻意不含任何设置项。空，就是这个决定本身**：本项目显式采用 rustfmt 的
+# 默认风格，一条都不覆盖。
+#
+# 决定于 2026-07-30（Phase 1 收尾的 gap-closure 轮次，plan 01-28 的 checkpoint:decision，
+# 用户选定 option-a）。为什么要为「什么都不改」专门放一个文件：
+#
+#   一个被想过之后接受的取舍，与一个没人注意到的空洞，在仓库里长得一样。
+#
+# 没有 rustfmt.toml 时，「用默认风格」与「没人配置过 rustfmt」不可区分；有了这个
+# 文件，下一个想加 `max_width` 或 `comment_width` 的人知道自己是在推翻一个决定，
+# 而不是在填一处遗漏。
+#
+# 配套的闸门（缺任何一半，这个决定就只是一句声明）：
+#   - `.github/workflows/ci.yml` 的 engine job 第一步：`cargo fmt --all -- --check`
+#   - `just fmt-check`：本机等价简写（单行委托，见 justfile 文件头）
+#
+# 要覆盖某一项默认值时：在此写下设置项，并在同一处写清为什么默认值不够用——
+# 上面那句话对新增的每一行同样成立。

@@ -168,7 +168,9 @@ mod tests {
         let mut conn = Connection::open_in_memory().expect("in-memory db");
         super::migrations().to_latest(&mut conn).expect("first run");
         let first = user_version(&conn);
-        super::migrations().to_latest(&mut conn).expect("second run");
+        super::migrations()
+            .to_latest(&mut conn)
+            .expect("second run");
         let second = user_version(&conn);
         assert_eq!(first, second, "重复迁移不应推进 user_version");
         assert!(first > 0, "迁移执行后 user_version 应大于 0，实得 {first}");

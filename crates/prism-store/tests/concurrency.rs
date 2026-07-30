@@ -190,7 +190,10 @@ fn wal_truncated_on_close() {
 
     let wal_path = db_path.with_file_name("t.db-wal");
     let grew = std::fs::metadata(&wal_path).map(|m| m.len()).unwrap_or(0);
-    assert!(grew > 0, "expected the -wal file to have grown before close");
+    assert!(
+        grew > 0,
+        "expected the -wal file to have grown before close"
+    );
 
     store.close().expect("close store");
 

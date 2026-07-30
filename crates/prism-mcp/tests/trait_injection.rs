@@ -81,7 +81,10 @@ async fn post(
 ) -> reqwest::Response {
     let mut req = client
         .post(endpoint(addr))
-        .header(reqwest::header::ACCEPT, "application/json, text/event-stream")
+        .header(
+            reqwest::header::ACCEPT,
+            "application/json, text/event-stream",
+        )
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .header(reqwest::header::ORIGIN, "http://127.0.0.1")
         .header(
@@ -247,10 +250,7 @@ async fn a_leaky_source_is_never_reached_with_an_invalid_project_id() {
     // 少了它，一个「一律报 invalid-params」的 handler 也能让上面全绿。
     let body = call_list_feedback_with(&addr, json!({ "projectId": "proj-1" })).await;
     ct.cancel();
-    assert!(
-        body.contains(MARKER_ID),
-        "合法 projectId 也被拒了: {body}"
-    );
+    assert!(body.contains(MARKER_ID), "合法 projectId 也被拒了: {body}");
 }
 
 /// T-01-28：只绑 loopback；端口由 OS 分配（端口策略是 Phase 6 的事）。

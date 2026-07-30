@@ -50,10 +50,7 @@ const ARG_PROJECT_ID: &str = "projectId";
 /// 来自外部 agent，可能很长、也可能整段引用用户文档。
 fn project_id_of(request: &CallToolRequestParams) -> Result<&str, ErrorData> {
     fn reject() -> ErrorData {
-        ErrorData::invalid_params(
-            "tool argument `projectId` must be a non-empty string",
-            None,
-        )
+        ErrorData::invalid_params("tool argument `projectId` must be a non-empty string", None)
     }
 
     let value = request

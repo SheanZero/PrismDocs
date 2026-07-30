@@ -40,6 +40,33 @@
 `01-28-PLAN.md` 的 Task 2 会把最终结论回填到本小节。本小节只做指向，不做决策。
 （记账澄清：rustfmt 决策不在 01-27——01-27 只做 CI 闸门接线，其 objective 亦写明二选一定案在 01-28。）
 
+##### 定案：选项 A（2026-07-30，01-28 Task 1）
+
+**上面那句「本小节只做指向，不做决策」写于计划期，到此为止**——它承诺的回填就是本小节。
+上面的选项 A / B 原文一字未改地留着：它们是这次决策的备选记录，不是待办。
+
+**用户在 `01-28-PLAN.md` 的 `checkpoint:decision` 上选定 `option-a`**：采用 rustfmt 默认风格，
+一次性格式化全仓并加 CI 闸门。呈给用户的决策材料是本机实跑读数而非印象描述：
+`cargo fmt --all -- --check` 报 **38 个 hunk，覆盖 40 个受版本控制 `.rs` 文件中的 23 个**，
+落地后的真实 diff 为 **+142 / −82 行**，全部为换行与缩进偏好，无一处改变语义。
+
+落地形态（三件套缺任何一件，这个决定就只是一句声明）：
+
+- `rustfmt.toml`（仓库根，新建）——**不含任何设置项；空本身就是「显式采用默认风格」这个决定**。
+  文件头写明了这一点与做出决定的日期，使下一个读者不会把它当成「没人配置过」。
+- `.github/workflows/ci.yml` engine job 的**第一条实质步骤** `cargo fmt --all -- --check`，
+  且 `dtolnay/rust-toolchain@stable` 的 `components` 里**显式列出 `rustfmt`**（不靠默认 profile 捎带）。
+- `justfile` 的 `fmt-check` recipe——单行委托，与 CI 那步逐字等价。
+
+**已知风险的实测结论：全部 7 处 `include_str!` 源码序断言在格式化后逐条重跑仍绿，0 处锚点被修改。**
+唯一真正被格式化触及的重叠点是 `src-tauri/src/lib.rs:167`（`tauri::Builder::default()` 与
+`.setup(` 被并到同一行），而该处锚点取的是 `tauri::Builder::default()` 这个**完整语句片段**，
+并行不影响子串匹配——这是 01-21 把锚点从裸名字收窄为完整语句时顺带买到的韧性。
+
+**仍未证明的那一半（不要当成已验证）**：本条的证据止于「本机 `cargo fmt --all -- --check` 退出 0，
+且注入劣化排版后退出 1 并点名文件」。这条闸门**在 GitHub Actions 上是否真的会红，与 WINDOWS id=14
+一样尚未观测**——该 workflow 至今未在 CI 上跑过。首次真实 CI 运行时应与 id=14 一并核对。
+
 ## 01-05 登记
 
 - **`state add-decision` 写出的行前缀是 `[Phase ?]` 而非 `[Phase 1]`**（.planning/STATE.md 第 82–94 行）。

@@ -55,7 +55,9 @@ fn sample_event() -> EngineEvent {
 async fn recv_within(rx: &mut Receiver<EngineEvent>, who: &str) -> EngineEvent {
     tokio::time::timeout(RECV_TIMEOUT, rx.recv())
         .await
-        .unwrap_or_else(|_| panic!("{who} 在 {RECV_TIMEOUT:?} 内没有收到事件——publish 没有把它送出去"))
+        .unwrap_or_else(|_| {
+            panic!("{who} 在 {RECV_TIMEOUT:?} 内没有收到事件——publish 没有把它送出去")
+        })
         .unwrap_or_else(|e| panic!("{who} 的接收端异常关闭: {e}"))
 }
 
@@ -69,11 +71,7 @@ async fn bus_delivers_to_subscriber() {
     bus.publish(sample_event());
 
     let got = recv_within(&mut rx, "订阅者").await;
-    assert_eq!(
-        got,
-        sample_event(),
-        "订阅者收到的不是 publish 的那条事件"
-    );
+    assert_eq!(got, sample_event(), "订阅者收到的不是 publish 的那条事件");
 }
 
 #[tokio::test]
@@ -261,7 +259,10 @@ async fn post(
 ) -> reqwest::Response {
     let mut req = client
         .post(format!("http://{addr}{MCP_MOUNT_PATH}"))
-        .header(reqwest::header::ACCEPT, "application/json, text/event-stream")
+        .header(
+            reqwest::header::ACCEPT,
+            "application/json, text/event-stream",
+        )
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .header(reqwest::header::ORIGIN, "http://127.0.0.1")
         .header(
@@ -319,7 +320,11 @@ async fn call_list_feedback(addr: &SocketAddr, project_id: &str) -> String {
         json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }),
     )
     .await;
-    assert!(ack.status().is_success(), "initialized 失败: {}", ack.status());
+    assert!(
+        ack.status().is_success(),
+        "initialized 失败: {}",
+        ack.status()
+    );
     let _ = ack.text().await;
 
     let call = post(

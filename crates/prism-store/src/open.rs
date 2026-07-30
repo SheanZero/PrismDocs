@@ -285,7 +285,8 @@ mod tests {
                 "parse of {input:?}"
             );
             // 准入 = 解析成功且不低于下界。畸形串因此与「太旧」同一处置。
-            let admits = matches!(super::parse_sqlite_version(input), Some(got) if got >= super::MIN_SQLITE);
+            let admits =
+                matches!(super::parse_sqlite_version(input), Some(got) if got >= super::MIN_SQLITE);
             assert_eq!(
                 admits,
                 expected.is_some_and(|got| got >= super::MIN_SQLITE),

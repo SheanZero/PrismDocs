@@ -148,8 +148,7 @@ const COMMANDS_EXPECTED_OK: [&str; 7] = [
 ///
 /// 本测试进程**从不调用** `init_secrets`，所以 `keyring_core` 没有默认后端，
 /// 这两条会在触碰真实登录钥匙串之前就失败——测试因此不会弹授权框、CI 也不会挂。
-const COMMANDS_NEEDING_KEYCHAIN: [&str; 3] =
-    ["set_api_key", "api_key_status", "delete_api_key"];
+const COMMANDS_NEEDING_KEYCHAIN: [&str; 3] = ["set_api_key", "api_key_status", "delete_api_key"];
 
 /// [`COMMANDS`] 里的命令全部可经 IPC 到达，且错误串已被映射收敛。
 ///
@@ -163,8 +162,8 @@ fn all_commands_are_registered() {
     let (app, _dir) = mock_app();
     let webview = main_webview(&app);
 
-    let control = invoke(&webview, "definitely_not_a_command", json!({}))
-        .expect_err("未注册的命令必须报错");
+    let control =
+        invoke(&webview, "definitely_not_a_command", json!({})).expect_err("未注册的命令必须报错");
     let control = control.to_string();
     assert!(
         control.contains("not found"),

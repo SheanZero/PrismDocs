@@ -4,6 +4,11 @@
 # § Environment Availability）；本文件的 check-* recipe 是装了 just 时的等价简写，
 # 每条只做单行委托、不重复实现断言逻辑——两份实现必然漂移。
 
+# 格式闸门：本项目显式采用 rustfmt 默认风格（决定记在 rustfmt.toml 的文件头）。
+# 与 CI engine job 的第一步逐字等价。
+fmt-check:
+    cargo fmt --all -- --check
+
 # 成功标准 1-b：无重复 rusqlite / reqwest / libsqlite3-sys
 check-dup:
     bash scripts/check-deps.sh dup

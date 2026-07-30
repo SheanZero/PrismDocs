@@ -140,5 +140,8 @@ fn search_hit_serialises_with_camel_case_fields() {
 
     assert!(json.contains("\"docId\""), "not camelCase: {json}");
     assert!(json.contains("\"relPath\""), "not camelCase: {json}");
-    assert!(json.contains("\"title\":null"), "unexpected payload: {json}");
+    assert!(
+        json.contains("\"title\":null"),
+        "unexpected payload: {json}"
+    );
 }

@@ -146,11 +146,11 @@ mod tests {
     fn count_key(store: &Store, key: &str) -> i64 {
         store
             .read(|c| {
-                Ok(c.query_row(
-                    "SELECT count(*) FROM settings WHERE key = ?1",
-                    [key],
-                    |r| r.get(0),
-                )?)
+                Ok(
+                    c.query_row("SELECT count(*) FROM settings WHERE key = ?1", [key], |r| {
+                        r.get(0)
+                    })?,
+                )
             })
             .expect("count key")
     }
@@ -163,7 +163,11 @@ mod tests {
     fn settings_roundtrip() {
         let (_dir, store) = fixture();
 
-        assert_eq!(read(&store, SETTING_MODEL), None, "未写入的 key 应读回 None");
+        assert_eq!(
+            read(&store, SETTING_MODEL),
+            None,
+            "未写入的 key 应读回 None"
+        );
 
         store
             .write(|tx| set_setting(tx, SETTING_MODEL, "first-model"))

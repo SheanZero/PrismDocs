@@ -104,7 +104,10 @@ async fn probe(
 
     let mut req = client
         .post(format!("http://{addr}{MCP_MOUNT_PATH}"))
-        .header(reqwest::header::ACCEPT, "application/json, text/event-stream")
+        .header(
+            reqwest::header::ACCEPT,
+            "application/json, text/event-stream",
+        )
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(init_body());
 
@@ -324,7 +327,11 @@ async fn oneshot(router: Router, req: Request<Body>) -> (StatusCode, String) {
 async fn host_layer_alone_is_what_rejects_a_foreign_host() {
     let guarded = sentinel_router().layer(from_fn(require_local_host));
     let (status, body) = oneshot(guarded, request("evil.example.com", None, None)).await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "require_local_host 未拦下外域 Host");
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "require_local_host 未拦下外域 Host"
+    );
     assert!(!body.contains(SENTINEL), "请求仍到达了 handler: {body}");
 
     // 反证（落点唯一）：摘掉这一层，同一请求直达 sentinel。

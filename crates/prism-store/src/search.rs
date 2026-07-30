@@ -88,11 +88,7 @@ fn row_to_hit(row: &rusqlite::Row<'_>) -> rusqlite::Result<SearchHit> {
 /// 查询长度分流对调用方不可见——两条分支返回同一种结果，只是走的索引不同。
 /// 空查询（去掉首尾空白后为空）返回空结果：那既不是 FTS 表达得了的查询，
 /// 在 LIKE 分支上又会退化成「匹配全部」。
-pub fn search(
-    conn: &Connection,
-    project_id: &str,
-    q: &str,
-) -> Result<Vec<SearchHit>, StoreError> {
+pub fn search(conn: &Connection, project_id: &str, q: &str) -> Result<Vec<SearchHit>, StoreError> {
     let trimmed = q.trim();
     if trimmed.is_empty() {
         return Ok(Vec::new());

@@ -94,7 +94,10 @@ pub async fn delete_api_key(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn get_setting(state: State<'_, AppState>, key: String) -> Result<Option<String>, String> {
+pub async fn get_setting(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<Option<String>, String> {
     delegate(&state, move |engine| engine.get_setting(&key)).await
 }
 

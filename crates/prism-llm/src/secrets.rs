@@ -261,7 +261,9 @@ mod tests {
 
         set_api_key(FIXTURE_SECRET).expect("write to the real keychain");
         assert_eq!(
-            get_api_key().expect("read back from the real keychain").as_deref(),
+            get_api_key()
+                .expect("read back from the real keychain")
+                .as_deref(),
             Some(FIXTURE_SECRET)
         );
         delete_api_key().expect("clean up the real keychain entry");

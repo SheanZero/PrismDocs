@@ -24,7 +24,9 @@ mod tests {
     fn fingerprint_is_a_64_char_lowercase_hex_string() {
         let fp = content_fingerprint("hello");
         assert_eq!(fp.len(), 64, "unexpected fingerprint: {fp}");
-        assert!(fp.chars().all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
+        assert!(fp
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
     }
 
     #[test]

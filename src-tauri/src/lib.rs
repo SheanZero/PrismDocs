@@ -54,7 +54,8 @@ const LOG_CEILING_DIRECTIVE: &str = "rmcp=info";
 ///
 /// 只陈述**规则**，不回显 `RUST_LOG` 的原值：环境变量里可能带着与本项目无关的
 /// 别的东西，把它抄进日志等于用一条防外泄的告警制造一次外泄（T-01G-26）。
-const LOG_CEILING_WARNING: &str = "the environment-supplied log filter exceeds the project ceiling; \
+const LOG_CEILING_WARNING: &str =
+    "the environment-supplied log filter exceeds the project ceiling; \
      the `rmcp` target was capped at INFO because raising it dumps whole MCP message bodies \
      into the local log sink";
 
@@ -167,23 +168,22 @@ pub fn run() {
     // 与「钥匙串后端注册失败不阻断启动」同一口径。
     let _ = init_tracing();
 
-    let builder = tauri::Builder::default()
-        .setup(|app| {
-            use tauri::Manager;
+    let builder = tauri::Builder::default().setup(|app| {
+        use tauri::Manager;
 
-            let state = AppState::bootstrap()?;
+        let state = AppState::bootstrap()?;
 
-            // 钥匙串后端注册失败**不阻断启动**（D-06：无 key 时应用照常启动）。
-            // 把它冒泡给 setup 会让「登录钥匙串被锁」变成开不了窗口。
-            #[cfg(target_os = "macos")]
-            if let Err(err) = state.engine.init_secrets() {
-                tracing::warn!(error = %err, "keychain backend unavailable; secrets are disabled");
-            }
+        // 钥匙串后端注册失败**不阻断启动**（D-06：无 key 时应用照常启动）。
+        // 把它冒泡给 setup 会让「登录钥匙串被锁」变成开不了窗口。
+        #[cfg(target_os = "macos")]
+        if let Err(err) = state.engine.init_secrets() {
+            tracing::warn!(error = %err, "keychain backend unavailable; secrets are disabled");
+        }
 
-            bus_adapter::spawn(app.handle().clone(), state.engine.subscribe());
-            app.manage(state);
-            Ok(())
-        });
+        bus_adapter::spawn(app.handle().clone(), state.engine.subscribe());
+        app.manage(state);
+        Ok(())
+    });
 
     // 命令面按构建形态分叉，**编译期**而不是运行期。
     //
@@ -298,7 +298,10 @@ mod tests {
         let _guard = RustLogGuard::set("trace");
 
         let (filter, capped) = build_log_filter();
-        assert!(capped, "RUST_LOG=trace 超出项目上限，降档这件事必须被报告出来");
+        assert!(
+            capped,
+            "RUST_LOG=trace 超出项目上限，降档这件事必须被报告出来"
+        );
 
         assert!(
             !probe(filter, &RMCP_DEBUG_PROBE),
@@ -358,7 +361,10 @@ mod tests {
 
     impl std::io::Write for CaptureWriter {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().expect("capture buffer").extend_from_slice(buf);
+            self.0
+                .lock()
+                .expect("capture buffer")
+                .extend_from_slice(buf);
             Ok(buf.len())
         }
 

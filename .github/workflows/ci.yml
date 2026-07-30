@@ -30,9 +30,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # `rustfmt` 显式列出，不靠 `stable` 的默认 profile 捎带。默认 profile 今天确实
+      # 带 rustfmt，但那是一个**默认值**而不是一个承诺：它哪天变了，下面那步会以
+      # 「找不到 rustfmt」的形态失败，而不是以「格式不合」的形态失败——两者的红长得
+      # 不一样，但都是红，很容易被当成一回事修错方向。写出来它就不再取决于默认值。
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, llvm-tools-preview
+          components: clippy, llvm-tools-preview, rustfmt
+
+      # 排在本 job 的最前面（在 checkout 与工具链之后的第一条实质步骤），理由与
+      # `check-secrets.sh` 把 selftest 排在 scan 之前、frontend job 把 lint 排在
+      # test 之前同源：先红的应当是更早、更便宜的那一层。这一步不编译任何东西。
+      #
+      # 它守的是 rustfmt.toml 里写下的那个决定（空文件 = 显式采用默认风格）。
+      # 没有这一步，那个文件就只是一句声明——格式差异会照常累积且 CI 照常绿，
+      # 而这正是它从 plan 01-03 一路悬到 01-28 的原因。
+      #
+      # 断言逻辑的唯一实现是 `cargo fmt` 自身；`just fmt-check` 是本机的等价简写。
+      - name: Format check (rustfmt default style)
+        run: cargo fmt --all -- --check
 
       # 单一 workspace 下产物落在仓库根 target/；缓存指向 shell 子目录下的构建目录
       # 会 miss（它已不存在），后果是每次全量重编。

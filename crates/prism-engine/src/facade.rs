@@ -80,9 +80,7 @@ impl Engine {
     /// 长度分流（≥3 字符 trigram MATCH / <3 字符 LIKE 回退）封装在 `prism-store`
     /// 内部，facade 不重复判断——两处各判一次必然漂移。
     pub fn search(&self, project_id: &str, q: &str) -> Result<Vec<SearchHit>, EngineError> {
-        Ok(self
-            .store
-            .read(|c| prism_store::search(c, project_id, q))?)
+        Ok(self.store.read(|c| prism_store::search(c, project_id, q))?)
     }
 
     /// 写入冒烟页的样例文档，返回它们所属的 project id。
