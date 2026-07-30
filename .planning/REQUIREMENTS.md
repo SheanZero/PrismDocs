@@ -143,8 +143,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 1 | Gaps Found |
-| INFRA-02 | Phase 1 | Gaps Found |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
 | IMPORT-01 | Phase 2 | Pending |
 | IMPORT-02 | Phase 2 | Pending |
 | IMPORT-03 | Phase 2 | Pending |

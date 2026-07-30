@@ -17,7 +17,7 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: 基建骨架** - Cargo workspace + Tauri 薄 shell + schema v1 + keyring + 事件总线/IPC 通路证明，五项不可逆决策全部落地
+- [x] **Phase 1: 基建骨架** - Cargo workspace + Tauri 薄 shell + schema v1 + keyring + 事件总线/IPC 通路证明，五项不可逆决策全部落地 (completed 2026-07-30)
 - [ ] **Phase 2: F1 导入与同步** - 导入向导、watcher 管线、文档身份与版本快照、回声抑制、frontmatter 字节保真回写（坑最密集阶段）
 - [ ] **Phase 3: 锚定引擎 ★** - TD-01 实现与真实 agent diff 标定，MigrationResult/ChangeSet 接口冻结（四消费方），TD-01 v0.2 修订
 - [ ] **Phase 4: F2′ 速读区** - prism-llm 传输层先行，中文摘要 + ❓ 决策清单 + 变更条 + 已读基线 + GFM/Mermaid 渲染（可与 Phase 5 并行）
@@ -32,7 +32,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Goal**: 可独立测试的 Rust engine workspace + Tauri 薄 shell 就绪，五项不可逆决策（单写者 SQLite + 读池、FTS5 CJK tokenizer、keyring-core 用法、prism-mcp trait 反转、notify-then-fetch）全部落地并各有验证通路
 **Depends on**: Nothing (first phase)
-**Requirements**: INFRA-01, INFRA-02, INFRA-03
+**Requirements**: INFRA-01, INFRA-02
+<!-- INFRA-03 于 2026-07-29 由 plan 01-25 改映射至 Phase 4（需求文本的「支持 Anthropic/
+     OpenAI 兼容端点」半句需要 Phase 4 才存在的 chat client），故不再列在此处。
+     它仍自 Phase 1 起作为跨切需求执行，已完成的三部分记录在 REQUIREMENTS.md 表下注。
+     此行曾是 stale 源：2026-07-30 的 `phase.complete` 读它而把 INFRA-03 误标为完成。 -->
 **Success Criteria** (what must be TRUE):
 
   1. engine workspace 不依赖 tauri 即可 `cargo test` 全绿（D-01）；`cargo tree -d` 无重复 rusqlite/reqwest；prism-mcp 仅依赖注入的 service trait，编译期无 facade↔mcp 依赖环
@@ -261,7 +265,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 ∥ 5 → 6 → 7 → 8（�
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 基建骨架 | 28/28 | In Progress|  |
+| 1. 基建骨架 | 28/28 | Complete    | 2026-07-30 |
 | 2. F1 导入与同步 | 0/TBD | Not started | - |
 | 3. 锚定引擎 ★ | 0/TBD | Not started | - |
 | 4. F2′ 速读区 | 0/TBD | Not started | - |
