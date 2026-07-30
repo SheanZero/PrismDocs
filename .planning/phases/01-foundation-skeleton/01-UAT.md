@@ -3,16 +3,16 @@ status: testing
 phase: 01-foundation-skeleton
 source: [01-VERIFICATION.md]
 started: 2026-07-30T00:40:00Z
-updated: 2026-07-30T00:40:00Z
+updated: 2026-07-30T02:25:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: 真实 WebView 下的 CSP 与 IPC 双通路（同时承载成功标准 2 的复验）
+number: 3
+name: CI workflow 的首次真实 GitHub Actions 运行
 expected: |
-  六步全部正常，三个入口读数与 01-09 一致。第 ④ 步的两条新指令预期不触发：
-  Phase 1 前端不含原生 `<form>` 提交，桌面窗口也不会被嵌套。
+  四项全部成立：fmt 步骤在 engine job 最前且为绿；contents: read 下 upload-artifact 仍可上传；
+  concurrency 收掉同 commit 双跑；两个缓存分段互不恢复。
 awaiting: user response
 
 ## Tests
@@ -33,7 +33,7 @@ why_human: CSP 只在真实 WebView 里生效——`src/lib/tauri-security.test.
 
 ⚠️ 出现违规时的处理：只放宽 `devCsp`，或按控制台点名的指令逐项追加到 `csp`；**禁止**把 `csp` 设回 `null`，也**禁止**直接删掉 01-24 新加的两条指令——若确需放宽，先在 `tauri-security.test.ts` 的精确相等断言上过一次评审（WINDOWS id=8）。
 
-result: [pending]
+result: pass
 
 ### 2. 日志 sink 真的有落点
 
@@ -49,7 +49,27 @@ why_human: `tracing::dispatcher::has_been_set()` 只证明 dispatcher 就位，�
 
 ⚠️ 01-21 之后**必须走默认档位**：该 plan 给 env filter 加了项目天花板（`src-tauri/src/lib.rs:51` `LOG_CEILING_DIRECTIVE = "rmcp=info"`），原先「用 `RUST_LOG` 提档观察」既观察不到目标、也不再是 sink 有落点的证据（WINDOWS id=9）。
 
-result: [pending]
+result: pass
+evidence: |
+  步骤 1（默认档位，无 RUST_LOG）——与 `crates/prism-store/src/settings.rs:85-88` 逐字对应：
+    2026-07-30T02:19:03.691980Z  WARN prism_store::settings: LLM endpoint uses plaintext
+    http to a non-loopback host host="example.com"
+
+  步骤 2（RUST_LOG=trace）——三条判据全部命中：
+    2026-07-30T02:20:55.006066Z  WARN prismdocs_shell: the environment-supplied log filter
+    exceeds the project ceiling; the `rmcp` target was capped at INFO because raising it
+    dumps whole MCP message bodies into the local log sink
+    ① 前缀逐字匹配 `src-tauri/src/lib.rs:58`
+    ② 点名 `rmcp` capped at INFO
+    ③ 正文不含传入值 `trace` —— 只陈述规则，不回显
+
+  旁证：同一次运行里 `tao::platform_impl::*` 的 TRACE 行照常出现，证明天花板是**针对性的**
+  （只压 `rmcp`），不是全局一刀切降档 —— 正是 LOG_CEILING_DIRECTIVE 文档所述形态。
+  若为全局 cap，这些 TRACE 行不应存在。
+
+  附带证实：`rusqlite_migration: no migration to run, db already up to date`；
+  `keyring_core` default store = `apple-native-keyring-store`；
+  `Cred { service: "PrismDocs", account: "llm_api_key" }` 条目存在。
 
 ### 3. CI workflow 的首次真实 GitHub Actions 运行
 
@@ -68,9 +88,9 @@ result: [pending]
 ## Summary
 
 total: 3
-passed: 0
+passed: 2
 issues: 0
-pending: 3
+pending: 1
 skipped: 0
 blocked: 0
 
