@@ -164,14 +164,26 @@ jobs:
           node-version: "22"
           cache: npm
 
-      # package-lock.json 由 npm 11 生成，必须由 npm 11 校验。node 22 自带的是 npm 10，
-      # 两者对「本平台用不上的 optional 包」的 peerDependencies 处理不同：npm 11 不给它
-      # 解析 peer（锁文件因此不含 @emnapi/core|runtime 两条），npm 10 会解析、找不到、
-      # 报 EUSAGE 拒装。首次真实 CI 运行（run 30508455439）就是这么红的——本机 `npm ci`
-      # 全绿，因为本机是 npm 11。锁文件没坏，坏的是两边 npm 不同版本。
+      # 让 CI 的 npm 与生成 package-lock.json 的 npm 处在同一语义线上。
       #
-      # 升级 npm 时两边必须同步改：本机版本 → 这一行 → 重生锁文件。
-      - name: Pin npm to the version that generated package-lock.json
+      # 失败史（两次真实运行，不是推测）：
+      #   run 30508455439 — node 22 自带 npm 10 → `npm ci` EUSAGE，
+      #     Missing @emnapi/core|runtime@2.0.0-alpha.3 from lock file
+      #   run 30510085581 — 加了本步骤（npm 11.19）→ **同样的 EUSAGE**
+      #
+      # 第二次失败证伪了「npm 10 vs 11」这个诊断。真正的分界在 11.x 内部：
+      # 锁文件由本机 npm 11.6.2 生成，而 11.6.2 不给「本平台用不上的 optional 包」
+      # (`@napi-rs/wasm-runtime`，optional+dev) 解析 peerDependencies，于是锁文件里
+      # 没有那两条；npm 11.19 会解析、找不到、拒装。
+      #
+      # 修法不是把 CI 钉回旧 npm，而是让锁文件符合当前语义：用
+      # `npx npm@11.19.0 install --package-lock-only` 重生，锁文件补上那两条之后
+      # npm 10 / 11.6.2 / 11.19.0 三个版本实测全部 `npm ci` 通过（无一 EUSAGE）。
+      # 本步骤保留下来让 CI 的 npm 显式且可复现，不随 GitHub node 镜像漂移。
+      #
+      # ⚠️ 本机 npm 11.6.2 直接跑 `npm install` 会把那两条**删掉**，CI 随即再红。
+      # 本机重生锁文件必须走 `npx npm@11 install --package-lock-only`。
+      - name: Pin npm to the version line that generated package-lock.json
         run: npm i -g npm@11
 
       - run: npm ci
