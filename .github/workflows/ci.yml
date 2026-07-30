@@ -164,6 +164,16 @@ jobs:
           node-version: "22"
           cache: npm
 
+      # package-lock.json 由 npm 11 生成，必须由 npm 11 校验。node 22 自带的是 npm 10，
+      # 两者对「本平台用不上的 optional 包」的 peerDependencies 处理不同：npm 11 不给它
+      # 解析 peer（锁文件因此不含 @emnapi/core|runtime 两条），npm 10 会解析、找不到、
+      # 报 EUSAGE 拒装。首次真实 CI 运行（run 30508455439）就是这么红的——本机 `npm ci`
+      # 全绿，因为本机是 npm 11。锁文件没坏，坏的是两边 npm 不同版本。
+      #
+      # 升级 npm 时两边必须同步改：本机版本 → 这一行 → 重生锁文件。
+      - name: Pin npm to the version that generated package-lock.json
+        run: npm i -g npm@11
+
       - run: npm ci
 
       # 排在测试之前，理由与 `check-secrets.sh all` 把 selftest 排在 scan 之前同源：
